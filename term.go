@@ -31,12 +31,14 @@ func newLocalTermTab() (*TermTab,error) {
 }
 
 func newSSHTermTab(conf *Config) (*TermTab,error) {
+
+
 	c := ssh.ClientConfig{User: conf.User, Auth: []ssh.AuthMethod{
 		ssh.Password(conf.Pswd),
-	}}
-	c.HostKeyCallback = func(hostname string, remote net.Addr, key ssh.PublicKey) error {
+	}, HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 		return nil
-	}
+	}}
+
 	addr := conf.Host + ":" + strconv.Itoa(conf.Port)
 	conn, err := ssh.Dial("tcp", addr, &c)
 	if err != nil {
@@ -44,6 +46,16 @@ func newSSHTermTab(conf *Config) (*TermTab,error) {
 		return nil, err
 	}
 	session, err := conn.NewSession()
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	modes := ssh.TerminalModes{
+		ssh.ECHO:          0,     // disable echoing
+		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
+		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
+	}
+	err = session.RequestPty("xterm-color", 24, 80, modes)
 	if err != nil {
 		log.Println(err)
 		return nil, err
@@ -65,7 +77,14 @@ func newSSHTermTab(conf *Config) (*TermTab,error) {
 		if err != nil {
 			log.Println(err)
 		}
+		session.Close()
 	}()
 
+	go func() {
+		err := session.Shell()
+		if err != nil {
+			log.Println(err)
+		}
+	}()
 	return &TermTab{name: conf.Name, term: term, session: session, local: false},nil
 }
