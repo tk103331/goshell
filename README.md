@@ -1,2 +1,2 @@
 # fyneshell
-A shell client by fyne, local PTY or SSH.
+A simple SSH GUI client via [Fyne](https://fyne.io).

@@ -9,7 +9,7 @@ import (
 	"strconv"
 )
 
-type TermTab struct {
+type Term struct {
 	name string
 	term *terminal.Terminal
 	tab container.TabItem
@@ -18,7 +18,17 @@ type TermTab struct {
 	local bool
 }
 
-func newLocalTermTab() (*TermTab,error) {
+func (t *Term) send(txt string) {
+	t.term.Write([]byte(txt))
+}
+
+func (t *Term) FocusGained() {
+	if t.term != nil {
+		t.term.FocusGained()
+	}
+}
+
+func newLocalTerm() (*Term,error) {
 	term := terminal.New()
 	go func() {
 		err := term.RunLocalShell()
@@ -27,10 +37,10 @@ func newLocalTermTab() (*TermTab,error) {
 			return
 		}
 	}()
-	return &TermTab{name: "local", term: term, local: true},nil
+	return &Term{name: "local", term: term, local: true},nil
 }
 
-func newSSHTermTab(conf *Config) (*TermTab,error) {
+func newSSHTerm(conf *Config) (*Term,error) {
 
 
 	c := ssh.ClientConfig{User: conf.User, Auth: []ssh.AuthMethod{
@@ -86,5 +96,5 @@ func newSSHTermTab(conf *Config) (*TermTab,error) {
 			log.Println(err)
 		}
 	}()
-	return &TermTab{name: conf.Name, term: term, session: session, local: false},nil
+	return &Term{name: conf.Name, term: term, session: session, local: false},nil
 }

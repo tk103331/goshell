@@ -15,25 +15,48 @@ import (
 
 const APP_NAME = "Fyne Shell"
 const APP_KEY = "com.github.tk103331.fyneshell"
-const APP_DATA = "data"
+const APP_SESSIONS = "sessions"
+const APP_COMMANDS = "commands"
+
+var iconMap map[string]fyne.Resource
+
+func init() {
+	iconMap = make(map[string]fyne.Resource)
+	iconMap["file"] = theme.FileIcon()
+	iconMap["document"] = theme.DocumentIcon()
+	iconMap["computer"] = theme.ComputerIcon()
+}
 
 type Window struct {
 	app fyne.App
 	win fyne.Window
 	tabs *container.DocTabs
-	terms []*TermTab
+	terms map[*container.TabItem]*Term
 	confs []*Config
+	cmds []*Cmd
+
+	cmdbar *fyne.Container
 }
 
-func (w *Window) AddTermTab(tab *TermTab) {
-	w.terms = append(w.terms, tab)
+func (w *Window) AddTermTab(tab *Term) {
 	tabItem := container.TabItem{Text: tab.name, Icon: theme.ComputerIcon(), Content: tab.term}
 	w.tabs.Append(&tabItem)
+	w.terms[&tabItem] = tab
+	w.tabs.Select(&tabItem)
 }
 
 func (w *Window) AddConfig(conf *Config) {
 	w.confs = append(w.confs, conf)
 	w.save()
+}
+
+func (w *Window) AddCmd(cmd *Cmd) {
+	w.cmds = append(w.cmds, cmd)
+	w.save()
+	icon := iconMap[cmd.Icon]
+	w.cmdbar.Add(widget.NewButtonWithIcon(cmd.Text, icon, func() {
+		w.sendCmd(cmd)
+	}))
 }
 
 func (w *Window) RemoveConfig(index int) {
@@ -49,12 +72,19 @@ func (w *Window) Run() {
 	w.app = app.NewWithID(APP_KEY)
 	w.app.Settings().SetTheme(theme.DarkTheme())
 
-	confs := w.app.Preferences().String(APP_DATA)
+	confs := w.app.Preferences().String(APP_SESSIONS)
 	err := json.Unmarshal([]byte(confs), &w.confs)
 	if err != nil {
 		log.Println(err)
 	}
 
+	cmds := w.app.Preferences().String(APP_COMMANDS)
+	err = json.Unmarshal([]byte(cmds), &w.cmds)
+	if err != nil {
+		log.Println(err)
+	}
+
+	w.terms = make(map[*container.TabItem]*Term)
 	w.win = w.app.NewWindow(APP_NAME)
 	w.win.Resize(fyne.NewSize(800, 600))
 	w.initUI()
@@ -64,7 +94,7 @@ func (w *Window) Run() {
 
 func (w *Window) initUI() {
 	toolbar := widget.NewToolbar(widget.NewToolbarAction(theme.ComputerIcon(), func() {
-		tab,err := newLocalTermTab()
+		tab,err := newLocalTerm()
 		if err != nil {
 			dialog.NewError(err, w.win)
 			return
@@ -72,13 +102,26 @@ func (w *Window) initUI() {
 		w.AddTermTab(tab)
 	}), widget.NewToolbarAction(theme.DocumentIcon(), func() {
 		w.showNewSSHDialog()
-	}),widget.NewToolbarSpacer(), widget.NewToolbarAction(theme.InfoIcon(), func() {
+	}), widget.NewToolbarAction(theme.ContentAddIcon(), func() {
+		w.showNewCmdDialog()
+	}),
+	widget.NewToolbarSpacer(), widget.NewToolbarAction(theme.InfoIcon(), func() {
 		w.showAboutDialog()
 	}))
 
-	quickbar := container.NewHBox(widget.NewButton("test", func() {
-
-	}))
+	buttons := make([]fyne.CanvasObject, len(w.cmds))
+	for i,cmd := range w.cmds {
+		if icon,ok := iconMap[cmd.Icon]; ok {
+			buttons[i] = widget.NewButtonWithIcon(cmd.Name, icon, func() {
+				w.sendCmd(cmd)
+			})
+		} else {
+			buttons[i] = widget.NewButton(cmd.Name, func() {
+				w.sendCmd(cmd)
+			})
+		}
+	}
+	w.cmdbar = container.NewHBox(buttons...)
 
 	sidebar := widget.NewList(func() int {
 		return len(w.confs)
@@ -103,7 +146,7 @@ func (w *Window) initUI() {
 			w.RemoveConfig(id)
 		}
 		open.OnTapped = func() {
-			tab,err := newSSHTermTab(conf)
+			tab,err := newSSHTerm(conf)
 			if err != nil {
 				return
 			}
@@ -111,15 +154,15 @@ func (w *Window) initUI() {
 		}
 	})
 
-	w.tabs = container.NewDocTabs(&container.TabItem{Text: "test", Icon: theme.ComputerIcon(), Content: widget.NewLabel("asdfsadfasdf")})
-	//w.createLocalTermTab()
+	w.tabs = container.NewDocTabs()
+	w.createLocalTermTab()
 	w.tabs.OnClosed = func(item *container.TabItem) {
 
 	}
 	center := container.NewHSplit(sidebar, w.tabs)
-	center.Offset = 0.3
+	center.Offset = 0.2
 
-	content := container.NewBorder(toolbar, quickbar, nil, nil, center)
+	content := container.NewBorder(toolbar, w.cmdbar, nil, nil, center)
 
 	w.win.SetContent(content)
 }
@@ -141,6 +184,7 @@ func (w *Window) sshDialog(conf *Config) dialog.Dialog {
 	userEntry := widget.NewEntry()
 	pswdEntry := widget.NewEntry()
 
+	portEntry.Text = "22"
 	portEntry.Validator = func(s string) error {
 		_, err := strconv.Atoi(s)
 		return err
@@ -187,16 +231,43 @@ func (w *Window) sshDialog(conf *Config) dialog.Dialog {
 		}
 	}, w.win)
 
-	dlg.Resize(fyne.NewSize(300, 400))
+	dlg.Resize(fyne.NewSize(400, 400))
 	return dlg
 }
 
+func (w *Window) showNewCmdDialog() {
+	nameEntry := widget.NewEntry()
+	textEntry := widget.NewEntry()
+
+	icons := make([]string, len(iconMap))
+	i := 0
+	for k,_ := range iconMap {
+		icons[i] = k
+		i++
+	}
+	iconSelect := widget.NewSelectEntry(icons)
+
+	dlg := dialog.NewForm("New Command", "OK", "Cancel", []*widget.FormItem{
+		widget.NewFormItem("Name", nameEntry),
+		widget.NewFormItem("Text", textEntry),
+		widget.NewFormItem("Icon", iconSelect),
+	}, func(b bool) {
+		if b {
+			cmd := &Cmd{Name: nameEntry.Text, Text: textEntry.Text, Icon: iconSelect.Text}
+			w.AddCmd(cmd)
+		}
+	}, w.win)
+
+	dlg.Resize(fyne.NewSize(400,300))
+	dlg.Show()
+}
+
 func (w *Window) showAboutDialog() {
-	dialog.NewInformation(APP_NAME, "FyneShell is a shell client by fyne, for SSH or local PTY.", w.win).Show()
+	dialog.NewInformation(APP_NAME, "FyneShell is a simple SSH client via Fyne.", w.win).Show()
 }
 
 func (w *Window) createLocalTermTab() {
-	tab,err := newLocalTermTab()
+	tab,err := newLocalTerm()
 	if err != nil {
 		dialog.NewError(err, w.win)
 		return
@@ -204,13 +275,32 @@ func (w *Window) createLocalTermTab() {
 	w.AddTermTab(tab)
 }
 
+func (w *Window) sendCmd(cmd *Cmd) {
+	tabItem := w.tabs.Selected()
+	if tabItem != nil {
+		if term, ok := w.terms[tabItem]; ok {
+			term.send(cmd.Text)
+			//term.FocusGained()
+		}
+		//w.tabs.Select(tabItem)
+	}
+}
+
 func (w *Window) save() {
-	data, err := json.Marshal(w.confs)
+	confs, err := json.Marshal(w.confs)
 	if err != nil {
 		log.Println(err)
 		return
 	}
-	w.app.Preferences().SetString(APP_DATA, string(data))
+	w.app.Preferences().SetString(APP_SESSIONS, string(confs))
+
+	cmds, err := json.Marshal(w.cmds)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	w.app.Preferences().SetString(APP_COMMANDS, string(cmds))
+
 }
 
 func Run() {
