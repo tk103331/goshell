@@ -1,2 +1,2 @@
-# fyneshell
+# goshell
 A simple SSH GUI client via [Fyne](https://fyne.io).
