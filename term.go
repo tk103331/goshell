@@ -1,4 +1,4 @@
-package fyneshell
+package goshell
 
 import (
 	"fyne.io/fyne/v2/container"

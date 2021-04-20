@@ -1,4 +1,4 @@
-module github.com/tk103331/fyneshell
+module github.com/tk103331/goshell
 
 go 1.16
 

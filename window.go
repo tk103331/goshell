@@ -1,4 +1,4 @@
-package fyneshell
+package goshell
 
 import (
 	"encoding/json"
@@ -13,8 +13,8 @@ import (
 	"strconv"
 )
 
-const APP_NAME = "Fyne Shell"
-const APP_KEY = "com.github.tk103331.fyneshell"
+const APP_NAME = "Go Shell"
+const APP_KEY = "com.github.tk103331.goshell"
 const APP_SESSIONS = "sessions"
 const APP_COMMANDS = "commands"
 
@@ -238,6 +238,7 @@ func (w *Window) sshDialog(conf *Config) dialog.Dialog {
 func (w *Window) showNewCmdDialog() {
 	nameEntry := widget.NewEntry()
 	textEntry := widget.NewEntry()
+	textEntry.MultiLine = true
 
 	icons := make([]string, len(iconMap))
 	i := 0
@@ -263,7 +264,7 @@ func (w *Window) showNewCmdDialog() {
 }
 
 func (w *Window) showAboutDialog() {
-	dialog.NewInformation(APP_NAME, "FyneShell is a simple SSH client via Fyne.", w.win).Show()
+	dialog.NewInformation(APP_NAME, "GoShell is a simple SSH client via Fyne.", w.win).Show()
 }
 
 func (w *Window) createLocalTermTab() {

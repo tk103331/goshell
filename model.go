@@ -1,4 +1,4 @@
-package fyneshell
+package goshell
 
 type Config struct {
 	Name string
