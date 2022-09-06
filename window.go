@@ -1,7 +1,6 @@
-package goshell
+package main
 
 import (
-	"encoding/json"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
@@ -9,8 +8,6 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"log"
-	"strconv"
 )
 
 const APP_NAME = "Go Shell"
@@ -28,12 +25,12 @@ func init() {
 }
 
 type Window struct {
-	app fyne.App
-	win fyne.Window
-	tabs *container.DocTabs
+	app   fyne.App
+	win   fyne.Window
+	tabs  *container.DocTabs
 	terms map[*container.TabItem]*Term
-	confs []*Config
-	cmds []*Cmd
+	confs []Config
+	cmds  []*Cmd
 
 	cmdbar *fyne.Container
 }
@@ -45,7 +42,7 @@ func (w *Window) AddTermTab(tab *Term) {
 	w.tabs.Select(&tabItem)
 }
 
-func (w *Window) AddConfig(conf *Config) {
+func (w *Window) AddConfig(conf *SSHConfig) {
 	w.confs = append(w.confs, conf)
 	w.save()
 }
@@ -67,23 +64,17 @@ func (w *Window) RemoveConfig(index int) {
 	w.save()
 }
 
-func (w *Window) Run() {
+func (w *Window) Run(stop <-chan struct{}) {
 
 	w.app = app.NewWithID(APP_KEY)
 	w.app.Settings().SetTheme(theme.DarkTheme())
 
-	confs := w.app.Preferences().String(APP_SESSIONS)
-	err := json.Unmarshal([]byte(confs), &w.confs)
-	if err != nil {
-		log.Println(err)
-	}
+	go func() {
+		defer w.app.Quit()
+		<-stop
+	}()
 
-	cmds := w.app.Preferences().String(APP_COMMANDS)
-	err = json.Unmarshal([]byte(cmds), &w.cmds)
-	if err != nil {
-		log.Println(err)
-	}
-
+	w.load()
 	w.terms = make(map[*container.TabItem]*Term)
 	w.win = w.app.NewWindow(APP_NAME)
 	w.win.Resize(fyne.NewSize(800, 600))
@@ -94,24 +85,24 @@ func (w *Window) Run() {
 
 func (w *Window) initUI() {
 	toolbar := widget.NewToolbar(widget.NewToolbarAction(theme.ComputerIcon(), func() {
-		tab,err := newLocalTerm()
+		tab, err := newLocalTerm()
 		if err != nil {
 			dialog.NewError(err, w.win)
 			return
 		}
 		w.AddTermTab(tab)
 	}), widget.NewToolbarAction(theme.DocumentIcon(), func() {
-		w.showNewSSHDialog()
+		w.showCreateConfigDialog()
 	}), widget.NewToolbarAction(theme.ContentAddIcon(), func() {
 		w.showNewCmdDialog()
 	}),
-	widget.NewToolbarSpacer(), widget.NewToolbarAction(theme.InfoIcon(), func() {
-		w.showAboutDialog()
-	}))
+		widget.NewToolbarSpacer(), widget.NewToolbarAction(theme.InfoIcon(), func() {
+			w.showAboutDialog()
+		}))
 
 	buttons := make([]fyne.CanvasObject, len(w.cmds))
-	for i,cmd := range w.cmds {
-		if icon,ok := iconMap[cmd.Icon]; ok {
+	for i, cmd := range w.cmds {
+		if icon, ok := iconMap[cmd.Icon]; ok {
 			buttons[i] = widget.NewButtonWithIcon(cmd.Name, icon, func() {
 				w.sendCmd(cmd)
 			})
@@ -138,19 +129,15 @@ func (w *Window) initUI() {
 		open := box.Objects[4].(*widget.Button)
 
 		conf := w.confs[id]
-		label.Text = conf.Name
+		label.Text = conf.Name()
 		edit.OnTapped = func() {
-			w.showEditSSHDialog(conf)
+			w.showModifyConfigDialog(conf)
 		}
 		del.OnTapped = func() {
 			w.RemoveConfig(id)
 		}
 		open.OnTapped = func() {
-			tab,err := newSSHTerm(conf)
-			if err != nil {
-				return
-			}
-			w.AddTermTab(tab)
+			conf.Term(w)
 		}
 	})
 
@@ -167,113 +154,12 @@ func (w *Window) initUI() {
 	w.win.SetContent(content)
 }
 
-func (w *Window) showNewSSHDialog() {
-	dlg := w.sshDialog(nil)
-	dlg.Show()
-}
-
-func (w *Window) showEditSSHDialog(conf *Config) {
-	dlg := w.sshDialog(conf)
-	dlg.Show()
-}
-
-func (w *Window) sshDialog(conf *Config) dialog.Dialog {
-	nameEntry := widget.NewEntry()
-	hostEntry := widget.NewEntry()
-	portEntry := widget.NewEntry()
-	userEntry := widget.NewEntry()
-	pswdEntry := widget.NewEntry()
-
-	portEntry.Text = "22"
-	portEntry.Validator = func(s string) error {
-		_, err := strconv.Atoi(s)
-		return err
-	}
-	pswdEntry.Password = true
-
-	title := "New SSH config"
-	if conf != nil {
-		nameEntry.Text = conf.Name
-		nameEntry.Disable()
-		hostEntry.Text = conf.Host
-		portEntry.Text = strconv.Itoa(conf.Port)
-		userEntry.Text = conf.User
-		pswdEntry.Text = conf.Pswd
-
-		title = "Modify SSH config"
-	}
-
-
-	dlg := dialog.NewForm(title, "OK", "Cancel", []*widget.FormItem{
-		widget.NewFormItem("Name", nameEntry),
-		widget.NewFormItem("Host", hostEntry),
-		widget.NewFormItem("Port", portEntry),
-		widget.NewFormItem("Username", userEntry),
-		widget.NewFormItem("Password", pswdEntry),
-	}, func(b bool) {
-		if b {
-			port,_ := strconv.Atoi(portEntry.Text)
-
-			c := conf
-			if c == nil {
-				c = newConfig(nameEntry.Text)
-			}
-			c.Host = hostEntry.Text
-			c.Port = port
-			c.User = userEntry.Text
-			c.Pswd = pswdEntry.Text
-
-			if conf == nil {
-				w.AddConfig(c)
-			} else {
-				w.save()
-			}
-		}
-	}, w.win)
-
-	dlg.Resize(fyne.NewSize(400, 400))
-	return dlg
-}
-
-func (w *Window) showNewCmdDialog() {
-	nameEntry := widget.NewEntry()
-	textEntry := widget.NewEntry()
-	textEntry.MultiLine = true
-
-	icons := make([]string, len(iconMap))
-	i := 0
-	for k,_ := range iconMap {
-		icons[i] = k
-		i++
-	}
-	iconSelect := widget.NewSelectEntry(icons)
-
-	dlg := dialog.NewForm("New Command", "OK", "Cancel", []*widget.FormItem{
-		widget.NewFormItem("Name", nameEntry),
-		widget.NewFormItem("Text", textEntry),
-		widget.NewFormItem("Icon", iconSelect),
-	}, func(b bool) {
-		if b {
-			cmd := &Cmd{Name: nameEntry.Text, Text: textEntry.Text, Icon: iconSelect.Text}
-			w.AddCmd(cmd)
-		}
-	}, w.win)
-
-	dlg.Resize(fyne.NewSize(400,300))
-	dlg.Show()
-}
-
 func (w *Window) showAboutDialog() {
 	dialog.NewInformation(APP_NAME, "GoShell is a simple SSH client via Fyne.", w.win).Show()
 }
 
-func (w *Window) createLocalTermTab() {
-	tab,err := newLocalTerm()
-	if err != nil {
-		dialog.NewError(err, w.win)
-		return
-	}
-	w.AddTermTab(tab)
+func (w *Window) showError(e error) {
+	dialog.ShowError(e, w.win)
 }
 
 func (w *Window) sendCmd(cmd *Cmd) {
@@ -281,29 +167,6 @@ func (w *Window) sendCmd(cmd *Cmd) {
 	if tabItem != nil {
 		if term, ok := w.terms[tabItem]; ok {
 			term.send(cmd.Text)
-			//term.FocusGained()
 		}
-		//w.tabs.Select(tabItem)
 	}
-}
-
-func (w *Window) save() {
-	confs, err := json.Marshal(w.confs)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	w.app.Preferences().SetString(APP_SESSIONS, string(confs))
-
-	cmds, err := json.Marshal(w.cmds)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-	w.app.Preferences().SetString(APP_COMMANDS, string(cmds))
-
-}
-
-func Run() {
-	(&Window{}).Run()
 }

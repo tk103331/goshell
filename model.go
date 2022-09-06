@@ -1,16 +1,4 @@
-package goshell
-
-type Config struct {
-	Name string
-	Host string
-	Port int
-	User string
-	Pswd string
-}
-
-func newConfig(name string) *Config {
-	return &Config{Name: name}
-}
+package main
 
 type Cmd struct {
 	Name string
