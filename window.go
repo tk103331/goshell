@@ -155,7 +155,7 @@ func (w *Window) initUI() {
 }
 
 func (w *Window) showAboutDialog() {
-	dialog.NewInformation(APP_NAME, "GoShell is a simple SSH client via Fyne.", w.win).Show()
+	dialog.NewInformation(APP_NAME, "GoShell is a simple terminal GUI client, written in Go,via Fyne. ", w.win).Show()
 }
 
 func (w *Window) showError(e error) {
