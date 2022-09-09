@@ -1,8 +1,8 @@
 package main
 
 import (
+	"encoding/json"
 	"fyne.io/fyne/v2/widget"
-	"github.com/fyne-io/terminal"
 	"golang.org/x/crypto/ssh"
 	"log"
 	"net"
@@ -10,12 +10,12 @@ import (
 )
 
 type SSHConfigData struct {
-	Name string
-	Type string
-	Host string
-	Port int
-	User string
-	Pswd string
+	Name string `json:"name,omitempty"`
+	Type string `json:"type,omitempty"`
+	Host string `json:"host,omitempty"`
+	Port int    `json:"port,omitempty"`
+	User string `json:"user,omitempty"`
+	Pswd string `json:"pswd,omitempty"`
 }
 
 type SSHConfigForm struct {
@@ -38,6 +38,17 @@ func (c *SSHConfig) Name() string {
 
 func (c *SSHConfig) Type() string {
 	return "ssh"
+}
+
+func (c *SSHConfig) Load(s string) error {
+	data := &SSHConfigData{}
+
+	err := json.Unmarshal([]byte(s), data)
+	if err != nil {
+		return err
+	}
+	c.data = data
+	return nil
 }
 
 func (c *SSHConfig) Data() interface{} {
@@ -134,9 +145,11 @@ func (c *SSHConfig) Term(win *Window) {
 		return
 	}
 
-	term := terminal.New()
+	term := NewTerm(conf.Name, c)
+
 	go func() {
-		err = term.RunWithConnection(in, out)
+		defer session.Close()
+		err = term.RunWithReaderAndWriter(in, out)
 		if err != nil {
 			log.Println(err)
 		}
@@ -149,6 +162,6 @@ func (c *SSHConfig) Term(win *Window) {
 			log.Println(err)
 		}
 	}()
-	tab := &Term{name: conf.Name, term: term, local: false}
-	win.AddTermTab(tab)
+
+	win.AddTermTab(term)
 }

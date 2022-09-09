@@ -16,11 +16,15 @@ GoShell is a simple terminal GUI client, written in Go,via [Fyne](https://fyne.i
 ![GoShell SSH](screenshot/ssh-conf.png)
 ### Docker Config
 ![GoShell Docker](screenshot/docker-conf.png)
-### Docker Container
+### Docker Select Container
 ![GoShell Docker](screenshot/docker-container.png)
+### K8S Config
+![GoShell Docker](screenshot/k8s-conf.png)
+### K8S Select Container
+![GoShell Docker](screenshot/k8s-container.png)
 
 # TODOs
 
 - UI/UX optimization
-- Configuration encryption
-- Supports K8S pod.
+- Configuration encryption 
+- ~~Supports K8S pod.~~

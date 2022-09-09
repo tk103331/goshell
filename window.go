@@ -8,6 +8,7 @@ import (
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/fyne-io/terminal"
 )
 
 const APP_NAME = "Go Shell"
@@ -36,7 +37,14 @@ type Window struct {
 }
 
 func (w *Window) AddTermTab(tab *Term) {
-	tabItem := container.TabItem{Text: tab.name, Icon: theme.ComputerIcon(), Content: tab.term}
+	tabItem := container.TabItem{Text: tab.Name(), Icon: theme.ComputerIcon(), Content: tab.term}
+	tab.AddConfigListener(func(config *terminal.Config) {
+		if len(config.Title) > 0 {
+			tabItem.Text = config.Title
+		} else {
+			tabItem.Text = tab.Name()
+		}
+	})
 	w.tabs.Append(&tabItem)
 	w.terms[&tabItem] = tab
 	w.tabs.Select(&tabItem)
@@ -85,11 +93,7 @@ func (w *Window) Run(stop <-chan struct{}) {
 
 func (w *Window) initUI() {
 	toolbar := widget.NewToolbar(widget.NewToolbarAction(theme.ComputerIcon(), func() {
-		tab, err := newLocalTerm()
-		if err != nil {
-			dialog.NewError(err, w.win)
-			return
-		}
+		tab := NewLocalTerm()
 		w.AddTermTab(tab)
 	}), widget.NewToolbarAction(theme.DocumentIcon(), func() {
 		w.showCreateConfigDialog()
@@ -144,7 +148,9 @@ func (w *Window) initUI() {
 	w.tabs = container.NewDocTabs()
 	w.createLocalTermTab()
 	w.tabs.OnClosed = func(item *container.TabItem) {
-
+		if term, ok := w.terms[item]; ok {
+			term.Exit()
+		}
 	}
 	center := container.NewHSplit(sidebar, w.tabs)
 	center.Offset = 0.2
@@ -166,7 +172,7 @@ func (w *Window) sendCmd(cmd *Cmd) {
 	tabItem := w.tabs.Selected()
 	if tabItem != nil {
 		if term, ok := w.terms[tabItem]; ok {
-			term.send(cmd.Text)
+			term.Send(cmd.Text)
 		}
 	}
 }

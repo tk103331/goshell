@@ -6,13 +6,13 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
-	"github.com/jinzhu/copier"
 	"log"
 )
 
 type Config interface {
 	Name() string
 	Type() string
+	Load(string) error
 	Data() interface{}
 	Form() *widget.Form
 	Term(*Window)
@@ -97,15 +97,19 @@ func (w *Window) load() {
 				var cfg Config
 				switch t {
 				case "ssh":
-					cfg = &SSHConfig{}
+					cfg = &SSHConfig{data: &SSHConfigData{}}
 				case "docker":
-					cfg = &DockerConfig{}
+					cfg = &DockerConfig{data: &DockerConfigData{}}
 				case "k8s":
-					cfg = &K8SConfig{}
+					cfg = &K8SConfig{data: &K8SConfigData{}}
 				default:
 					continue
 				}
-				err := copier.Copy(cfg, data)
+				bytes, err := json.Marshal(data)
+				if err != nil {
+					continue
+				}
+				err = cfg.Load(string(bytes))
 				if err != nil {
 					continue
 				}

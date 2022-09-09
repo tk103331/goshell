@@ -2,19 +2,19 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
-	"github.com/fyne-io/terminal"
 )
 
 type DockerConfigData struct {
-	Name string
-	Type string
-	Host string
+	Name string `json:"name,omitempty"`
+	Type string `json:"type,omitempty"`
+	Host string `json:"host,omitempty"`
 }
 
 type DockerConfig struct {
@@ -27,9 +27,19 @@ func (c *DockerConfig) Name() string {
 }
 
 func (c *DockerConfig) Type() string {
-	return "ssh"
+	return "docker"
 }
 
+func (c *DockerConfig) Load(s string) error {
+	data := &DockerConfigData{}
+
+	err := json.Unmarshal([]byte(s), data)
+	if err != nil {
+		return err
+	}
+	c.data = data
+	return nil
+}
 func (c *DockerConfig) Data() interface{} {
 	return c.data
 }
@@ -102,18 +112,19 @@ func (c *DockerConfig) Term(win *Window) {
 				win.showError(err)
 				return
 			}
-			term := terminal.New()
+
+			term := NewTerm(c.Name(), c)
+
 			go func() {
 				defer attach.Close()
-				err = term.RunWithConnection(attach.Conn, attach.Reader)
+				err = term.RunWithConnection(attach.Conn)
 				if err != nil {
 					win.showError(err)
 					return
 				}
 			}()
 
-			tab := &Term{name: c.Name(), term: term}
-			win.AddTermTab(tab)
+			win.AddTermTab(term)
 			if dlg != nil {
 				dlg.Hide()
 			}
