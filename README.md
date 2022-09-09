@@ -23,6 +23,23 @@ GoShell is a simple terminal GUI client, written in Go,via [Fyne](https://fyne.i
 ### K8S Select Container
 ![GoShell Docker](screenshot/k8s-container.png)
 
+### Building
+
+- Linux / MACOS
+``` shell
+    git clone https://github.com/tk103331/goshell.git
+    cd goshell
+    go build
+    sudo ./goshell
+```
+- Windows (Need to run with administrator rights)
+``` shell
+    git clone https://github.com/tk103331/goshell.git
+    cd goshell
+    go build
+    goshell
+```
+
 # TODOs
 
 - UI/UX optimization
