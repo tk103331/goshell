@@ -5,7 +5,7 @@ GoShell is a simple terminal GUI client, written in Go,via [Fyne](https://fyne.i
 
 # Features
 
-- Supports SSH、Docker、K8S(coming soon).
+- Supports SSH、Docker、K8S.
 - Supports Windows、Linux、MacOS platform.（thanks [Fyne](https://fyne.io)）
 - Supports shortcut command.
 
@@ -44,4 +44,4 @@ GoShell is a simple terminal GUI client, written in Go,via [Fyne](https://fyne.i
 
 - UI/UX optimization
 - Configuration encryption 
-- ~~Supports K8S pod.~~
+- Supports K8S pod.
