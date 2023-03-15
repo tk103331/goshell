@@ -85,6 +85,7 @@ func (c *SSHConfig) Form() *widget.Form {
 		c.data.Name = nameEntry.Text
 		c.data.Host = hostEntry.Text
 		c.data.Port, _ = strconv.Atoi(portEntry.Text)
+		c.data.User = userEntry.Text
 		c.data.Pswd = pswdEntry.Text
 	}
 	return widget.NewForm([]*widget.FormItem{
