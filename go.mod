@@ -3,7 +3,7 @@ module github.com/tk103331/goshell
 go 1.16
 
 require (
-	fyne.io/fyne/v2 v2.3.6-0.20230704203313-e050d7994adc
+	fyne.io/fyne/v2 v2.4.5
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/docker/distribution v2.8.2+incompatible // indirect
 	github.com/docker/docker v24.0.5+incompatible
