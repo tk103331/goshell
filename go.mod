@@ -6,7 +6,7 @@ require (
 	fyne.io/fyne/v2 v2.4.5
 	github.com/Microsoft/go-winio v0.6.1 // indirect
 	github.com/docker/distribution v2.8.2+incompatible // indirect
-	github.com/docker/docker v24.0.5+incompatible
+	github.com/docker/docker v24.0.9+incompatible
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/fyne-io/terminal v0.0.0-20230705214125-3f8c1fcd7dfa
