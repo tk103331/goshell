@@ -16,7 +16,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.0.2 // indirect
 	github.com/tk103331/stream v1.0.2
-	golang.org/x/crypto v0.33.0
+	golang.org/x/crypto v0.35.0
 	gotest.tools/v3 v3.5.0 // indirect
 	k8s.io/api v0.27.4
 	k8s.io/apimachinery v0.27.4
