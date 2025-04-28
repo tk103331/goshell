@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
-	"github.com/docker/docker/api/types"
+	containerTypes "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 )
 
@@ -81,7 +82,7 @@ func (c *DockerConfig) Term(win *Window) {
 		win.showError(err)
 		return
 	}
-	contList, err := dockerCli.ContainerList(context.Background(), types.ContainerListOptions{})
+	contList, err := dockerCli.ContainerList(context.Background(), containerTypes.ListOptions{})
 	if err != nil {
 		win.showError(err)
 		return
@@ -101,13 +102,13 @@ func (c *DockerConfig) Term(win *Window) {
 		label.SetText(cont.ID[:12])
 		btn.OnTapped = func() {
 
-			execId, err := dockerCli.ContainerExecCreate(context.Background(), cont.ID, types.ExecConfig{Tty: true, Detach: true, AttachStdin: true, AttachStderr: true, AttachStdout: true, Cmd: []string{"/bin/sh"}})
+			execId, err := dockerCli.ContainerExecCreate(context.Background(), cont.ID, containerTypes.ExecOptions{Tty: true, Detach: true, AttachStdin: true, AttachStderr: true, AttachStdout: true, Cmd: []string{"/bin/sh"}})
 			if err != nil {
 				win.showError(err)
 				return
 			}
 
-			attach, err := dockerCli.ContainerExecAttach(context.Background(), execId.ID, types.ExecStartCheck{Tty: true, Detach: false})
+			attach, err := dockerCli.ContainerExecAttach(context.Background(), execId.ID, containerTypes.ExecAttachOptions{Tty: true, Detach: false})
 			if err != nil {
 				win.showError(err)
 				return
