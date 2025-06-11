@@ -7,7 +7,7 @@ require (
 	github.com/docker/docker v28.2.2+incompatible
 	github.com/fyne-io/terminal v0.0.0-20250418150501-61f2dac1c2ad
 	github.com/tk103331/stream v1.0.2
-	golang.org/x/crypto v0.38.0
+	golang.org/x/crypto v0.39.0
 	k8s.io/api v0.33.1
 	k8s.io/apimachinery v0.33.1
 	k8s.io/client-go v0.33.1
@@ -91,7 +91,7 @@ require (
 	golang.org/x/oauth2 v0.27.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/term v0.32.0 // indirect
-	golang.org/x/text v0.25.0 // indirect
+	golang.org/x/text v0.26.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
 	google.golang.org/genproto v0.0.0-20210226172003-ab064af71705 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
