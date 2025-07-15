@@ -7,7 +7,7 @@ require (
 	github.com/docker/docker v28.3.2+incompatible
 	github.com/fyne-io/terminal v0.0.0-20250418150501-61f2dac1c2ad
 	github.com/tk103331/stream v1.0.2
-	golang.org/x/crypto v0.39.0
+	golang.org/x/crypto v0.40.0
 	k8s.io/api v0.33.2
 	k8s.io/apimachinery v0.33.2
 	k8s.io/client-go v0.33.2
@@ -87,11 +87,11 @@ require (
 	go.opentelemetry.io/otel/metric v1.35.0 // indirect
 	go.opentelemetry.io/otel/trace v1.35.0 // indirect
 	golang.org/x/image v0.24.0 // indirect
-	golang.org/x/net v0.38.0 // indirect
+	golang.org/x/net v0.41.0 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/term v0.32.0 // indirect
-	golang.org/x/text v0.26.0 // indirect
+	golang.org/x/sys v0.34.0 // indirect
+	golang.org/x/term v0.33.0 // indirect
+	golang.org/x/text v0.27.0 // indirect
 	golang.org/x/time v0.9.0 // indirect
 	google.golang.org/genproto v0.0.0-20210226172003-ab064af71705 // indirect
 	google.golang.org/protobuf v1.36.5 // indirect
