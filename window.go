@@ -20,9 +20,67 @@ var iconMap map[string]fyne.Resource
 
 func init() {
 	iconMap = make(map[string]fyne.Resource)
+
+	// 基础图标
 	iconMap["file"] = theme.FileIcon()
 	iconMap["document"] = theme.DocumentIcon()
 	iconMap["computer"] = theme.ComputerIcon()
+
+	// 操作类图标
+	iconMap["search"] = theme.SearchIcon()
+	iconMap["download"] = theme.DownloadIcon()
+	iconMap["upload"] = theme.UploadIcon()
+	iconMap["content-add"] = theme.ContentAddIcon()
+	iconMap["content-remove"] = theme.ContentRemoveIcon()
+	iconMap["content-copy"] = theme.ContentCopyIcon()
+	iconMap["content-cut"] = theme.ContentCutIcon()
+	iconMap["content-paste"] = theme.ContentPasteIcon()
+	iconMap["content-redo"] = theme.ContentRedoIcon()
+	iconMap["content-undo"] = theme.ContentUndoIcon()
+	iconMap["content-clear"] = theme.ContentClearIcon()
+
+	// 导航类图标
+	iconMap["navigate-back"] = theme.NavigateBackIcon()
+	iconMap["navigate-next"] = theme.NavigateNextIcon()
+	iconMap["home"] = theme.HomeIcon()
+
+	// 媒体类图标
+	iconMap["media-play"] = theme.MediaPlayIcon()
+	iconMap["media-pause"] = theme.MediaPauseIcon()
+	iconMap["media-stop"] = theme.MediaStopIcon()
+	iconMap["media-fast-forward"] = theme.MediaFastForwardIcon()
+	iconMap["media-record"] = theme.MediaRecordIcon()
+	iconMap["media-skip-next"] = theme.MediaSkipNextIcon()
+	iconMap["media-skip-previous"] = theme.MediaSkipPreviousIcon()
+
+	// 工具类图标
+	iconMap["help"] = theme.HelpIcon()
+	iconMap["info"] = theme.InfoIcon()
+	iconMap["warning"] = theme.WarningIcon()
+	iconMap["error"] = theme.ErrorIcon()
+	iconMap["settings"] = theme.SettingsIcon()
+
+	// 文件夹和存储类图标
+	iconMap["folder"] = theme.FolderIcon()
+	iconMap["folder-open"] = theme.FolderOpenIcon()
+
+	// 其他常用图标
+	iconMap["cancel"] = theme.CancelIcon()
+	iconMap["check"] = theme.ConfirmIcon()
+	iconMap["delete"] = theme.DeleteIcon()
+	iconMap["refresh"] = theme.ViewRefreshIcon()
+	iconMap["list"] = theme.ListIcon()
+	iconMap["calendar"] = theme.CalendarIcon()
+	iconMap["volume-up"] = theme.VolumeUpIcon()
+	iconMap["volume-down"] = theme.VolumeDownIcon()
+	iconMap["volume-mute"] = theme.VolumeMuteIcon()
+	iconMap["visibility"] = theme.VisibilityIcon()
+	iconMap["visibility-off"] = theme.VisibilityOffIcon()
+
+	// 系统类图标（避免重复）
+	iconMap["info"] = theme.InfoIcon()
+	iconMap["warning"] = theme.WarningIcon()
+	iconMap["error"] = theme.ErrorIcon()
 }
 
 type Window struct {
@@ -59,9 +117,50 @@ func (w *Window) AddCmd(cmd *Cmd) {
 	w.cmds = append(w.cmds, cmd)
 	w.save()
 	icon := iconMap[cmd.Icon]
-	w.cmdbar.Add(widget.NewButtonWithIcon(cmd.Text, icon, func() {
+	w.cmdbar.Add(widget.NewButtonWithIcon(cmd.Name, icon, func() {
 		w.sendCmd(cmd)
 	}))
+}
+
+func (w *Window) RemoveCmd(index int) {
+	if index < 0 || index >= len(w.cmds) {
+		return
+	}
+	w.cmds = append(w.cmds[:index], w.cmds[index+1:]...)
+	w.save()
+	w.refreshCmdBar()
+}
+
+func (w *Window) UpdateCmd(index int, cmd *Cmd) {
+	if index < 0 || index >= len(w.cmds) {
+		return
+	}
+	w.cmds[index] = cmd
+	w.save()
+	w.refreshCmdBar()
+}
+
+func (w *Window) refreshCmdBar() {
+	// 清空现有命令栏
+	w.cmdbar.Objects = nil
+
+	// 重新添加所有命令按钮
+	buttons := make([]fyne.CanvasObject, len(w.cmds))
+	for i, cmd := range w.cmds {
+		if icon, ok := iconMap[cmd.Icon]; ok {
+			buttons[i] = widget.NewButtonWithIcon(cmd.Name, icon, func() {
+				w.sendCmd(cmd)
+			})
+		} else {
+			buttons[i] = widget.NewButton(cmd.Name, func() {
+				w.sendCmd(cmd)
+			})
+		}
+	}
+	w.cmdbar = container.NewHBox(buttons...)
+
+	// 刷新显示
+	w.cmdbar.Refresh()
 }
 
 func (w *Window) RemoveConfig(index int) {
@@ -100,8 +199,8 @@ func (w *Window) initUI() {
 		w.AddTermTab(tab)
 	}), widget.NewToolbarAction(theme.DocumentIcon(), func() {
 		w.showCreateConfigDialog()
-	}), widget.NewToolbarAction(theme.ContentAddIcon(), func() {
-		w.showNewCmdDialog()
+	}), widget.NewToolbarAction(theme.ListIcon(), func() {
+		w.showCmdManagerDialog()
 	}),
 		widget.NewToolbarSpacer(),
 		widget.NewToolbarAction(theme.SettingsIcon(), func() {
@@ -180,6 +279,10 @@ func (w *Window) sendCmd(cmd *Cmd) {
 	if tabItem != nil {
 		if term, ok := w.terms[tabItem]; ok {
 			term.Send(cmd.Text)
+			// 如果启用了自动提交，则发送回车键
+			if cmd.AutoSubmit {
+				term.Send("\r")
+			}
 		}
 	}
 }
