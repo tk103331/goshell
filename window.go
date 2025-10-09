@@ -75,7 +75,10 @@ func (w *Window) RemoveConfig(index int) {
 func (w *Window) Run(stop <-chan struct{}) {
 
 	w.app = app.NewWithID(APP_KEY)
-	w.app.Settings().SetTheme(theme.DarkTheme())
+
+	// 加载用户设置
+	settings := w.LoadSettings()
+	w.ApplySettings(settings)
 
 	go func() {
 		defer w.app.Quit()
@@ -100,7 +103,11 @@ func (w *Window) initUI() {
 	}), widget.NewToolbarAction(theme.ContentAddIcon(), func() {
 		w.showNewCmdDialog()
 	}),
-		widget.NewToolbarSpacer(), widget.NewToolbarAction(theme.InfoIcon(), func() {
+		widget.NewToolbarSpacer(),
+		widget.NewToolbarAction(theme.SettingsIcon(), func() {
+			w.showSettingsDialog()
+		}),
+		widget.NewToolbarAction(theme.InfoIcon(), func() {
 			w.showAboutDialog()
 		}))
 
