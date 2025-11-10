@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	fyne.io/fyne/v2 v2.7.0
-	github.com/docker/docker v28.5.1+incompatible
+	github.com/docker/docker v28.5.2+incompatible
 	github.com/fyne-io/terminal v0.0.0-20250418150501-61f2dac1c2ad
 	github.com/tk103331/stream v1.0.2
 	golang.org/x/crypto v0.42.0
