@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fyne.io/fyne/v2/widget"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 	"log"
-	"net"
+	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -15,7 +17,22 @@ type SSHConfigData struct {
 	Host string `json:"host,omitempty"`
 	Port int    `json:"port,omitempty"`
 	User string `json:"user,omitempty"`
-	Pswd string `json:"pswd,omitempty"`
+	Pswd string `json:"pswd,omitempty"` // 加密存储
+}
+
+// getPassword 返回解密后的密码
+func (d *SSHConfigData) getPassword() (string, error) {
+	return decryptString(d.Pswd)
+}
+
+// setPassword 加密并设置密码
+func (d *SSHConfigData) setPassword(password string) (string, error) {
+	encrypted, err := encryptString(password)
+	if err != nil {
+		return "", err
+	}
+	d.Pswd = encrypted
+	return encrypted, nil
 }
 
 type SSHConfigForm struct {
@@ -70,13 +87,15 @@ func (c *SSHConfig) Form() *widget.Form {
 	}
 	pswdEntry.Password = true
 	data := c.data
+	isNewConfig := (data == nil)
 	if data != nil {
 		nameEntry.Text = data.Name
 		nameEntry.Disable()
 		hostEntry.Text = data.Host
 		portEntry.Text = strconv.Itoa(data.Port)
 		userEntry.Text = data.User
-		pswdEntry.Text = data.Pswd
+		// 修改时显示空密码，用户需要重新输入
+		pswdEntry.Text = ""
 	}
 	c.onOk = func() {
 		if c.data == nil {
@@ -86,7 +105,12 @@ func (c *SSHConfig) Form() *widget.Form {
 		c.data.Host = hostEntry.Text
 		c.data.Port, _ = strconv.Atoi(portEntry.Text)
 		c.data.User = userEntry.Text
-		c.data.Pswd = pswdEntry.Text
+		// 只在密码不为空时更新密码（允许不修改密码）
+		if pswdEntry.Text != "" || isNewConfig {
+			if _, err := c.data.setPassword(pswdEntry.Text); err != nil {
+				log.Printf("Failed to encrypt password: %v", err)
+			}
+		}
 	}
 	return widget.NewForm([]*widget.FormItem{
 		widget.NewFormItem("Name", nameEntry),
@@ -103,11 +127,32 @@ func (c *SSHConfig) OnOk() {
 
 func (c *SSHConfig) Term(win *Window) {
 	conf := c.data
-	cli := ssh.ClientConfig{User: conf.User, Auth: []ssh.AuthMethod{
-		ssh.Password(conf.Pswd),
-	}, HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-		return nil
-	}}
+
+	// 获取解密后的密码
+	password, err := conf.getPassword()
+	if err != nil {
+		log.Printf("Failed to decrypt password: %v", err)
+		win.showError(err)
+		return
+	}
+
+	// 创建已知主机文件路径
+	knownHostsPath := filepath.Join(os.Getenv("HOME"), ".ssh", "known_hosts")
+
+	// 创建主机密钥回调函数
+	hostKeyCallback, err := knownhosts.New(knownHostsPath)
+	if err != nil {
+		log.Printf("Failed to create host key callback: %v", err)
+		win.showError(err)
+		return
+	}
+
+	cli := ssh.ClientConfig{
+		User:            conf.User,
+		Auth:            []ssh.AuthMethod{ssh.Password(password)},
+		HostKeyCallback: hostKeyCallback,
+		Timeout:         10, // 10秒超时
+	}
 
 	addr := conf.Host + ":" + strconv.Itoa(conf.Port)
 	conn, err := ssh.Dial("tcp", addr, &cli)

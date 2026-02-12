@@ -2,6 +2,8 @@ module github.com/tk103331/goshell
 
 go 1.24.0
 
+toolchain go1.24.3
+
 require (
 	fyne.io/fyne/v2 v2.7.0
 	github.com/docker/docker v28.5.1+incompatible

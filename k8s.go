@@ -9,6 +9,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/fyne-io/terminal"
 	"github.com/tk103331/stream"
+	"log"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -18,10 +19,26 @@ import (
 )
 
 type K8SConfigData struct {
-	Name   string `json:"name,omitempty"`
-	Type   string `json:"type,omitempty"`
-	Server string `json:"server,omitempty"`
-	Token  string `json:"token,omitempty"`
+	Name       string `json:"name,omitempty"`
+	Type       string `json:"type,omitempty"`
+	Server     string `json:"server,omitempty"`
+	Token      string `json:"token,omitempty"` // 加密存储
+	InsecureTLS bool  `json:"insecureTLS,omitempty"` // 是否跳过TLS验证（默认false）
+}
+
+// getToken 返回解密后的token
+func (d *K8SConfigData) getToken() (string, error) {
+	return decryptString(d.Token)
+}
+
+// setToken 加密并设置token
+func (d *K8SConfigData) setToken(token string) (string, error) {
+	encrypted, err := encryptString(token)
+	if err != nil {
+		return "", err
+	}
+	d.Token = encrypted
+	return encrypted, nil
 }
 type K8SConfig struct {
 	data *K8SConfigData
@@ -55,12 +72,17 @@ func (c *K8SConfig) Form() *widget.Form {
 	tokenEntry := widget.NewEntry()
 	tokenEntry.MultiLine = true
 	tokenEntry.Wrapping = fyne.TextWrapBreak
+	insecureTLSCheck := widget.NewCheck("Skip TLS Verification (Not Recommended)", func(b bool) {})
+
 	data := c.data
+	isNewConfig := (data == nil)
 	if data != nil {
 		nameEntry.Text = data.Name
 		nameEntry.Disable()
 		serverEntry.Text = data.Server
-		tokenEntry.Text = data.Token
+		// 修改时显示空token，用户需要重新输入
+		tokenEntry.Text = ""
+		insecureTLSCheck.SetChecked(data.InsecureTLS)
 	}
 	c.onOk = func() {
 		if c.data == nil {
@@ -68,12 +90,19 @@ func (c *K8SConfig) Form() *widget.Form {
 		}
 		c.data.Name = nameEntry.Text
 		c.data.Server = serverEntry.Text
-		c.data.Token = tokenEntry.Text
+		// 只在token不为空或新配置时更新token
+		if tokenEntry.Text != "" || isNewConfig {
+			if _, err := c.data.setToken(tokenEntry.Text); err != nil {
+				log.Printf("Failed to encrypt token: %v", err)
+			}
+		}
+		c.data.InsecureTLS = insecureTLSCheck.Checked
 	}
 	return widget.NewForm([]*widget.FormItem{
 		widget.NewFormItem("Name", nameEntry),
 		widget.NewFormItem("Server", serverEntry),
 		widget.NewFormItem("Token", tokenEntry),
+		widget.NewFormItem("Security", insecureTLSCheck),
 	}...)
 }
 
@@ -89,12 +118,20 @@ type ExecOpt struct {
 
 func (c *K8SConfig) Term(win *Window) {
 	cfg := c.data
+
+	// 获取解密后的token
+	token, err := cfg.getToken()
+	if err != nil {
+		win.showError(err)
+		return
+	}
+
 	restCfg := &rest.Config{
 		Host:            cfg.Server,
-		BearerToken:     cfg.Token,
+		BearerToken:     token,
 		BearerTokenFile: "",
 		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: true,
+			Insecure: cfg.InsecureTLS, // 使用配置的设置，默认false
 		},
 	}
 	clientset, err := kubernetes.NewForConfig(restCfg)
