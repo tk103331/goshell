@@ -5,7 +5,7 @@ go 1.24.0
 toolchain go1.24.3
 
 require (
-	fyne.io/fyne/v2 v2.7.0
+	fyne.io/fyne/v2 v2.7.1
 	github.com/docker/docker v28.5.1+incompatible
 	github.com/fyne-io/terminal v0.0.0-20250418150501-61f2dac1c2ad
 	github.com/tk103331/stream v1.0.2
