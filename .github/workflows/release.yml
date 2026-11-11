@@ -56,7 +56,10 @@ jobs:
       - name: Upload to the draft release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber $(find dist -type f)
+        run: |
+          shopt -s nullglob
+          files=(dist/*/*.dmg dist/*/*-setup-*.exe dist/*/*.deb dist/*/*.rpm dist/*/*.tar.gz)
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber "${files[@]}"
 
   publish:
     needs: build
