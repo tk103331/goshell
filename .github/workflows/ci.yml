@@ -1,0 +1,24 @@
+# Builds and checks the app on every push and pull request. The release
+# workflow (.github/workflows/release.yml) makes the packaged apps.
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build
+        run: go build ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Check the i18n catalogs
+        run: go tool mygo i18n check

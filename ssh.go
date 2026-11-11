@@ -1,170 +1,155 @@
 package main
 
 import (
-	"encoding/json"
-	"fyne.io/fyne/v2/widget"
-	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/knownhosts"
+	"io"
 	"log"
+	"net"
 	"os"
-	"path/filepath"
 	"strconv"
+	"time"
+
+	"github.com/egoist/mygo"
+	"github.com/egoist/mygo/plugins/terminal"
+	"github.com/egoist/mygo/ui"
+	"golang.org/x/crypto/ssh"
+	"goshell/locales"
 )
 
 type SSHConfigData struct {
-	Name string `json:"name,omitempty"`
-	Type string `json:"type,omitempty"`
-	Host string `json:"host,omitempty"`
-	Port int    `json:"port,omitempty"`
-	User string `json:"user,omitempty"`
-	Pswd string `json:"pswd,omitempty"` // 加密存储
-}
-
-// getPassword 返回解密后的密码
-func (d *SSHConfigData) getPassword() (string, error) {
-	return decryptString(d.Pswd)
-}
-
-// setPassword 加密并设置密码
-func (d *SSHConfigData) setPassword(password string) (string, error) {
-	encrypted, err := encryptString(password)
-	if err != nil {
-		return "", err
-	}
-	d.Pswd = encrypted
-	return encrypted, nil
-}
-
-type SSHConfigForm struct {
-	nameEntry *widget.Entry
-	hostEntry *widget.Entry
-	portEntry *widget.Entry
-	userEntry *widget.Entry
-	pswdEntry *widget.Entry
+	Name    string `json:"name,omitempty"`
+	Type    string `json:"type,omitempty"`
+	Host    string `json:"host,omitempty"`
+	Port    int    `json:"port,omitempty"`
+	User    string `json:"user,omitempty"`
+	Pswd    string `json:"pswd,omitempty"`
+	KeyPath string `json:"keyPath,omitempty"`
+	KeyPswd string `json:"keyPswd,omitempty"`
 }
 
 type SSHConfig struct {
 	data *SSHConfigData
-	form *SSHConfigForm
-	onOk func()
+	port string // the port as the form edits it
 }
 
-func (c *SSHConfig) Name() string {
-	return c.data.Name
-}
+func (c *SSHConfig) Name() string      { return c.data.Name }
+func (c *SSHConfig) Type() string      { return "ssh" }
+func (c *SSHConfig) Data() interface{} { return c.data }
 
-func (c *SSHConfig) Type() string {
-	return "ssh"
-}
-
-func (c *SSHConfig) Load(s string) error {
-	data := &SSHConfigData{}
-
-	err := json.Unmarshal([]byte(s), data)
-	if err != nil {
-		return err
-	}
-	c.data = data
-	return nil
-}
-
-func (c *SSHConfig) Data() interface{} {
-	return c.data
-}
-
-func (c *SSHConfig) Form() *widget.Form {
-	c.form = &SSHConfigForm{}
-	nameEntry := widget.NewEntry()
-	hostEntry := widget.NewEntry()
-	portEntry := widget.NewEntry()
-	userEntry := widget.NewEntry()
-	pswdEntry := widget.NewEntry()
-
-	portEntry.Text = "22"
-	portEntry.Validator = func(s string) error {
-		_, err := strconv.Atoi(s)
-		return err
-	}
-	pswdEntry.Password = true
-	data := c.data
-	isNewConfig := (data == nil)
-	if data != nil {
-		nameEntry.Text = data.Name
-		nameEntry.Disable()
-		hostEntry.Text = data.Host
-		portEntry.Text = strconv.Itoa(data.Port)
-		userEntry.Text = data.User
-		// 修改时显示空密码，用户需要重新输入
-		pswdEntry.Text = ""
-	}
-	c.onOk = func() {
-		if c.data == nil {
-			c.data = &SSHConfigData{Type: c.Type()}
+func (c *SSHConfig) Fields(ctx *ui.Context, editing bool, w *Window) {
+	ui.Field(ctx, locales.FieldName(), func() {
+		e := ui.TextInput(ctx, &c.data.Name)
+		if editing {
+			e.ReadOnly(true)
 		}
-		c.data.Name = nameEntry.Text
-		c.data.Host = hostEntry.Text
-		c.data.Port, _ = strconv.Atoi(portEntry.Text)
-		c.data.User = userEntry.Text
-		// 只在密码不为空时更新密码（允许不修改密码）
-		if pswdEntry.Text != "" || isNewConfig {
-			if _, err := c.data.setPassword(pswdEntry.Text); err != nil {
-				log.Printf("Failed to encrypt password: %v", err)
+	})
+	ui.Field(ctx, locales.FieldHost(), func() { ui.TextInput(ctx, &c.data.Host) })
+	ui.Field(ctx, locales.FieldPort(), func() { ui.TextInput(ctx, &c.port) })
+	ui.Field(ctx, locales.FieldUsername(), func() { ui.TextInput(ctx, &c.data.User) })
+	ui.Field(ctx, locales.FieldPassword(), func() { ui.TextInput(ctx, &c.data.Pswd).Password() })
+	ui.Field(ctx, locales.FieldPrivateKey(), func() {
+		ui.Row(ctx).FillWidth().Gap(6).Children(func() {
+			ui.TextInput(ctx, &c.data.KeyPath).Grow(1).Placeholder("~/.ssh/id_ed25519")
+			if ui.Button(ctx, locales.BtnChooseKey()).Clicked() {
+				go func() {
+					paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{
+						Title:       locales.ChooseKeyTitle(),
+						ButtonLabel: locales.BtnUseKey(),
+					})
+					if err != nil || len(paths) == 0 {
+						return
+					}
+					w.onMain(func() { c.data.KeyPath = paths[0] })
+				}()
+			}
+		})
+	})
+	if c.data.KeyPath != "" {
+		ui.Field(ctx, locales.FieldKeyPassphrase(), func() {
+			ui.TextInput(ctx, &c.data.KeyPswd).Password()
+		})
+	}
+}
+
+func (c *SSHConfig) Apply() {
+	c.data.Type = c.Type()
+	if p, err := strconv.Atoi(c.port); err == nil {
+		c.data.Port = p
+	}
+}
+
+func (c *SSHConfig) Prefill() {
+	c.port = strconv.Itoa(c.data.Port)
+}
+
+func (c *SSHConfig) Validate() string {
+	if c.data.Name == "" {
+		return locales.ValNameRequired()
+	}
+	if c.data.Host == "" {
+		return locales.ValHostRequired()
+	}
+	if _, err := strconv.Atoi(c.port); err != nil {
+		return locales.ValPortNumber()
+	}
+	if p, err := strconv.Atoi(c.port); err == nil && (p <= 0 || p > 65535) {
+		return locales.ValPortRange()
+	}
+	if c.data.KeyPath != "" {
+		if _, err := os.Stat(c.data.KeyPath); err != nil {
+			return locales.ValKeyNotFound(c.data.KeyPath)
+		}
+	}
+	return ""
+}
+
+// Term dials the server and opens a tab with its shell.
+func (c *SSHConfig) Term(w *Window) {
+	data := c.data
+
+	// with a private key, offer it before the password
+	var auth []ssh.AuthMethod
+	if data.KeyPath != "" {
+		key, err := os.ReadFile(data.KeyPath)
+		if err != nil {
+			log.Println(err)
+			w.showError(err)
+			return
+		}
+		signer, err := ssh.ParsePrivateKey(key)
+		if err != nil {
+			if _, ok := err.(*ssh.PassphraseMissingError); ok {
+				signer, err = ssh.ParsePrivateKeyWithPassphrase(key, []byte(data.KeyPswd))
+			}
+			if err != nil {
+				log.Println(err)
+				w.showError(err)
+				return
 			}
 		}
+		auth = append(auth, ssh.PublicKeys(signer))
 	}
-	return widget.NewForm([]*widget.FormItem{
-		widget.NewFormItem("Name", nameEntry),
-		widget.NewFormItem("Host", hostEntry),
-		widget.NewFormItem("Port", portEntry),
-		widget.NewFormItem("Username", userEntry),
-		widget.NewFormItem("Password", pswdEntry),
-	}...)
-}
-
-func (c *SSHConfig) OnOk() {
-	c.onOk()
-}
-
-func (c *SSHConfig) Term(win *Window) {
-	conf := c.data
-
-	// 获取解密后的密码
-	password, err := conf.getPassword()
-	if err != nil {
-		log.Printf("Failed to decrypt password: %v", err)
-		win.showError(err)
-		return
-	}
-
-	// 创建已知主机文件路径
-	knownHostsPath := filepath.Join(os.Getenv("HOME"), ".ssh", "known_hosts")
-
-	// 创建主机密钥回调函数
-	hostKeyCallback, err := knownhosts.New(knownHostsPath)
-	if err != nil {
-		log.Printf("Failed to create host key callback: %v", err)
-		win.showError(err)
-		return
+	if data.Pswd != "" || len(auth) == 0 {
+		auth = append(auth, ssh.Password(data.Pswd))
 	}
 
 	cli := ssh.ClientConfig{
-		User:            conf.User,
-		Auth:            []ssh.AuthMethod{ssh.Password(password)},
-		HostKeyCallback: hostKeyCallback,
-		Timeout:         10, // 10秒超时
+		User:            data.User,
+		Auth:            auth,
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         15 * time.Second,
 	}
-
-	addr := conf.Host + ":" + strconv.Itoa(conf.Port)
+	addr := net.JoinHostPort(data.Host, strconv.Itoa(data.Port))
 	conn, err := ssh.Dial("tcp", addr, &cli)
 	if err != nil {
 		log.Println(err)
-		win.showError(err)
+		w.showError(err)
 		return
 	}
 	session, err := conn.NewSession()
 	if err != nil {
 		log.Println(err)
-		win.showError(err)
+		w.showError(err)
+		conn.Close()
 		return
 	}
 	modes := ssh.TerminalModes{
@@ -172,42 +157,65 @@ func (c *SSHConfig) Term(win *Window) {
 		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
 		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
 	}
-	err = session.RequestPty("xterm-color", 24, 80, modes)
-	if err != nil {
+	if err := session.RequestPty("xterm-256color", 24, 80, modes); err != nil {
 		log.Println(err)
-		win.showError(err)
+		w.showError(err)
+		session.Close()
+		conn.Close()
 		return
 	}
 	in, err := session.StdinPipe()
 	if err != nil {
 		log.Println(err)
-		win.showError(err)
+		w.showError(err)
+		session.Close()
+		conn.Close()
 		return
 	}
 	out, err := session.StdoutPipe()
 	if err != nil {
 		log.Println(err)
-		win.showError(err)
+		w.showError(err)
+		session.Close()
+		conn.Close()
 		return
 	}
 
-	term := NewTerm(conf.Name, c)
-
-	go func() {
-		defer session.Close()
-		err = term.RunWithReaderAndWriter(in, out)
-		if err != nil {
-			log.Println(err)
-		}
+	tab, _, err := w.newTab(data.Name, c, func() { session.Close() },
+		terminal.Options{Conn: &sshConn{session: session, in: in, out: out}})
+	if err != nil {
+		log.Println(err)
+		w.showError(err)
 		session.Close()
-	}()
+		conn.Close()
+		return
+	}
 
 	go func() {
-		err := session.Shell()
-		if err != nil {
+		if err := session.Shell(); err != nil {
 			log.Println(err)
 		}
 	}()
 
-	win.AddTermTab(term)
+	w.showToast(locales.ToastConnected(data.User+"@"+data.Name), "success")
+
+	w.onMain(func() {
+		w.addTermTab(tab)
+	})
+}
+
+// sshConn connects a terminal to an SSH session: the terminal reads what
+// the session writes, and writes what is typed to it, and resizes its PTY.
+type sshConn struct {
+	session *ssh.Session
+	in      io.WriteCloser
+	out     io.Reader
+}
+
+func (c *sshConn) Read(p []byte) (int, error)  { return c.out.Read(p) }
+func (c *sshConn) Write(p []byte) (int, error) { return c.in.Write(p) }
+func (c *sshConn) Close() error                { return c.session.Close() }
+
+func (c *sshConn) Resize(cols, rows int) error {
+	return c.session.WindowChange(cols, rows)
 }

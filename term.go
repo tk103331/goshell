@@ -1,124 +1,88 @@
 package main
 
 import (
-	"github.com/fyne-io/terminal"
-	"io"
-	"log"
-	"net"
+	"github.com/egoist/mygo/plugins/terminal"
+	"goshell/locales"
 )
 
-type Term struct {
-	name            string
-	term            *terminal.Terminal
-	stat            string
-	local           bool
-	sessionConfig   Config
-	termConfig      *terminal.Config
-	configListeners []func(*terminal.Config)
-	closeListeners  []func()
+// Tab is an open terminal tab.
+type Tab struct {
+	name   string // the name the tab was given when it was created
+	title  string // the title the program set, if any
+	term   *terminal.Terminal
+	cfg    Config
+	closer func() // closes the connection the terminal is fed with
 }
 
-func NewTerm(name string, cfg Config) *Term {
-	term := terminal.New()
-	tab := &Term{name: name, term: term, sessionConfig: cfg}
-	tab.watchConfig()
-	return tab
-}
-
-func (t *Term) Name() string {
+func (t *Tab) Name() string {
+	if t.title != "" {
+		return t.title
+	}
 	return t.name
 }
 
-func (t *Term) TermConfig() *terminal.Config {
-	return t.termConfig
-}
-
-func (t *Term) SessionConfig() Config {
-	return t.sessionConfig
-}
-
-func (t *Term) StartWithPipe(callback func(err error)) (io.WriteCloser, io.Reader) {
-
-	pipe1Reader, pipe1Writer := io.Pipe()
-	pipe2Reader, pipe2Writer := io.Pipe()
-
-	go func() {
-		err := t.term.RunWithConnection(pipe1Writer, pipe2Reader)
-		if err != nil {
-			callback(err)
-		}
-	}()
-	return pipe2Writer, pipe1Reader
-}
-
-func (t *Term) RunWithConnection(conn net.Conn) error {
-	return t.term.RunWithConnection(conn, conn)
-}
-
-func (t *Term) RunWithReaderAndWriter(in io.WriteCloser, out io.Reader) error {
-	return t.term.RunWithConnection(in, out)
-}
-
-func (t *Term) RunWithReadWriteCloser(wr io.ReadWriteCloser) error {
-	return t.term.RunWithConnection(wr, wr)
-}
-
-func (t *Term) Exit() {
-	t.term.Exit()
-	for _, listener := range t.closeListeners {
-		listener()
+// newTab makes a terminal for a new tab, which the caller adds to the
+// window with addTermTab once its connection is set up.
+func (w *Window) newTab(name string, cfg Config, closer func(), opts terminal.Options) (*Tab, *terminal.Terminal, error) {
+	tab := &Tab{name: name, cfg: cfg, closer: closer}
+	opts.OnTitle = func(title string) {
+		w.onMain(func() { tab.title = title })
 	}
-}
-
-func (t *Term) Send(txt string) {
-	t.term.Write([]byte(txt))
-}
-
-func (t *Term) FocusGained() {
-	if t.term != nil {
-		t.term.FocusGained()
+	opts.OnExit = func(int) {
+		w.showToast(locales.ToastSessionEnded(name), "")
+		w.removeTab(tab)
 	}
-}
-
-func (t *Term) AddConfigListener(fn func(config *terminal.Config)) {
-	if fn != nil {
-		t.configListeners = append(t.configListeners, fn)
+	opts.OnSearch = func(s terminal.SearchStatus) {
+		w.onMain(func() {
+			if w.selectedTab() != tab {
+				return
+			}
+			w.findTotal, w.findSel, w.findSearching = s.Total, s.Selected, s.Searching
+		})
 	}
+	opts.Theme, opts.DarkTheme = w.termTheme, nil
+	term, err := terminal.New(opts)
+	tab.term = term
+	return tab, term, err
 }
 
-func (t *Term) AddCloseListener(fn func()) {
-	if fn != nil {
-		t.closeListeners = append(t.closeListeners, fn)
+func (w *Window) addTermTab(tab *Tab) {
+	w.tabs = append(w.tabs, tab)
+	w.selected = len(w.tabs) - 1
+}
+
+func (w *Window) selectedTab() *Tab {
+	if w.selected < 0 || w.selected >= len(w.tabs) {
+		return nil
 	}
+	return w.tabs[w.selected]
 }
 
-func (t *Term) watchConfig() {
-	cfgChan := make(chan terminal.Config)
-	t.term.AddListener(cfgChan)
-	go func() {
-		for {
-			select {
-			case cfg := <-cfgChan:
-				t.termConfig = &cfg
-				for _, listener := range t.configListeners {
-					listener(t.termConfig)
+// removeTab closes the tab's terminal and its connection, and takes the tab
+// out of the window.
+func (w *Window) removeTab(tab *Tab) {
+	if tab.term != nil {
+		tab.term.Close()
+	}
+	if tab.closer != nil {
+		tab.closer()
+	}
+	w.onMain(func() {
+		for i, t := range w.tabs {
+			if t == tab {
+				w.tabs = append(w.tabs[:i], w.tabs[i+1:]...)
+				if w.selected >= len(w.tabs) {
+					w.selected = len(w.tabs) - 1
 				}
+				break
 			}
 		}
-	}()
+	})
 }
 
-func NewLocalTerm() *Term {
-	term := terminal.New()
-	go func() {
-		err := term.RunLocalShell()
-		if err != nil {
-			log.Println(err)
-			return
-		}
-	}()
-
-	t := &Term{name: "local", term: term}
-	t.watchConfig()
-	return t
+func (w *Window) closeAll() {
+	tabs := append([]*Tab(nil), w.tabs...)
+	for _, tab := range tabs {
+		w.removeTab(tab)
+	}
 }

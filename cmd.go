@@ -1,84 +1,69 @@
 package main
 
-import (
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/widget"
-)
+import "github.com/egoist/mygo/ui"
 
-func (w *Window) showNewCmdDialog() {
-	nameEntry := widget.NewEntry()
-	textEntry := widget.NewEntry()
-	textEntry.MultiLine = true
+import "goshell/locales"
 
-	// 创建排序后的图标列表
-	icons := make([]string, 0, len(iconMap))
-	for k := range iconMap {
-		icons = append(icons, k)
-	}
-	iconSelect := widget.NewSelect(icons, nil)
-
-	// 添加自动提交复选框
-	autoSubmitCheck := widget.NewCheck("Auto Submit (press Enter automatically)", func(b bool) {})
-
-	dlg := dialog.NewForm("New Command", "OK", "Cancel", []*widget.FormItem{
-		widget.NewFormItem("Name", nameEntry),
-		widget.NewFormItem("Text", textEntry),
-		widget.NewFormItem("Icon", iconSelect),
-		widget.NewFormItem("", autoSubmitCheck),
-	}, func(b bool) {
-		if b {
-			cmd := &Cmd{
-				Name:       nameEntry.Text,
-				Text:       textEntry.Text,
-				Icon:       iconSelect.Selected,
-				AutoSubmit: autoSubmitCheck.Checked,
-			}
-			w.AddCmd(cmd)
-		}
-	}, w.win)
-
-	dlg.Resize(fyne.NewSize(400, 350))
-	dlg.Show()
+// openNewCmd opens the dialog that creates a shortcut command.
+func (w *Window) openNewCmd() {
+	w.cmdEdit = -1
+	w.cmdName, w.cmdText, w.cmdIcon = "", "", ""
+	w.cmdOpen = true
 }
 
-// showModifyCmdDialog 显示修改命令对话框
-func (w *Window) showModifyCmdDialog(index int, cmd *Cmd) {
-	nameEntry := widget.NewEntry()
-	nameEntry.SetText(cmd.Name)
-	textEntry := widget.NewEntry()
-	textEntry.SetText(cmd.Text)
-	textEntry.MultiLine = true
-
-	// 创建排序后的图标列表
-	icons := make([]string, 0, len(iconMap))
-	for k := range iconMap {
-		icons = append(icons, k)
+// editCmd opens the dialog that edits an existing command.
+func (w *Window) editCmd(i int) {
+	if i < 0 || i >= len(w.cmds) {
+		return
 	}
-	iconSelect := widget.NewSelect(icons, nil)
-	iconSelect.SetSelected(cmd.Icon)
+	w.cmdEdit = i
+	w.cmdName, w.cmdText, w.cmdIcon = w.cmds[i].Name, w.cmds[i].Text, w.cmds[i].Icon
+	w.cmdOpen = true
+}
 
-	// 添加自动提交复选框
-	autoSubmitCheck := widget.NewCheck("Auto Submit (press Enter automatically)", func(b bool) {})
-	autoSubmitCheck.SetChecked(cmd.AutoSubmit)
+func (w *Window) addCmd(cmd *Cmd) {
+	w.cmds = append(w.cmds, cmd)
+	w.save()
+}
 
-	dlg := dialog.NewForm("Modify Command", "OK", "Cancel", []*widget.FormItem{
-		widget.NewFormItem("Name", nameEntry),
-		widget.NewFormItem("Text", textEntry),
-		widget.NewFormItem("Icon", iconSelect),
-		widget.NewFormItem("", autoSubmitCheck),
-	}, func(b bool) {
-		if b {
-			updatedCmd := &Cmd{
-				Name:       nameEntry.Text,
-				Text:       textEntry.Text,
-				Icon:       iconSelect.Selected,
-				AutoSubmit: autoSubmitCheck.Checked,
-			}
-			w.UpdateCmd(index, updatedCmd)
+func (w *Window) cmdDialog(c *ui.Context) {
+	ui.Modal(c, &w.cmdOpen, func() {
+		title := locales.NewCommand()
+		if w.cmdEdit >= 0 {
+			title = locales.EditCommand()
 		}
-	}, w.win)
-
-	dlg.Resize(fyne.NewSize(400, 350))
-	dlg.Show()
+		ui.Column(c).Width(460).Padding(16).Gap(12).Children(func() {
+			ui.Text(c, title)
+			ui.Form(c, func() {
+				ui.Field(c, locales.FieldName(), func() { ui.TextInput(c, &w.cmdName) })
+				ui.Field(c, locales.FieldCmdText(), func() { ui.TextArea(c, &w.cmdText).Lines(3, 6) })
+				ui.Field(c, locales.FieldCmdIcon(), func() {
+					ui.Combobox(c, &w.cmdIcon, w.cmdIcons)
+				})
+			})
+			if w.cmdName == "" || w.cmdText == "" {
+				ui.Text(c, locales.CmdRequired()).TextColor(c.Theme().TextMuted)
+			}
+			ui.Row(c).Gap(8).Children(func() {
+				ui.Spacer(c)
+				if ui.Button(c, locales.BtnCancel()).Clicked() {
+					w.cmdOpen = false
+				}
+				ok := ui.PrimaryButton(c, locales.BtnOK())
+				if w.cmdName == "" || w.cmdText == "" {
+					ok.Disabled(true)
+				}
+				if ok.Clicked() {
+					cmd := &Cmd{Name: w.cmdName, Text: w.cmdText, Icon: w.cmdIcon}
+					if w.cmdEdit >= 0 && w.cmdEdit < len(w.cmds) {
+						w.cmds[w.cmdEdit] = cmd
+						w.save()
+					} else {
+						w.addCmd(cmd)
+					}
+					w.cmdOpen = false
+				}
+			})
+		})
+	})
 }
