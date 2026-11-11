@@ -58,6 +58,8 @@
   "btnUseKey": "使用",
   "fieldServer": "服务器",
   "fieldToken": "Token",
+  "fieldSecurity": "安全",
+  "insecureTLS": "跳过 TLS 验证（不推荐）",
 
   "valNameRequired": "名称不能为空。",
   "valHostRequired": "主机不能为空。",
@@ -83,6 +85,7 @@
   "editCommand": "编辑快捷命令",
   "fieldCmdText": "命令内容",
   "fieldCmdIcon": "图标",
+  "cmdAutoSubmit": "发送后自动回车执行",
   "cmdRequired": "名称和内容不能为空。",
 
   "findSearching": "搜索中…",

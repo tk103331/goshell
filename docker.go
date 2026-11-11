@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"github.com/egoist/mygo/plugins/terminal"
 	"github.com/egoist/mygo/ui"
@@ -70,7 +70,7 @@ type dockerDialog struct {
 	open   bool
 	cfg    *DockerConfig
 	cli    *client.Client
-	conts  []types.Container
+	conts  []container.Summary
 	err    error
 	loaded bool
 }
@@ -78,7 +78,7 @@ type dockerDialog struct {
 func (st *dockerDialog) load() {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	conts, err := st.cli.ContainerList(ctx, types.ContainerListOptions{})
+	conts, err := st.cli.ContainerList(ctx, container.ListOptions{})
 	st.win.onMain(func() {
 		st.conts, st.err, st.loaded = conts, err, true
 	})
@@ -126,7 +126,7 @@ func (st *dockerDialog) dialog(c *ui.Context) {
 func (st *dockerDialog) connect(contID string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	execID, err := st.cli.ContainerExecCreate(ctx, contID, types.ExecConfig{
+	execID, err := st.cli.ContainerExecCreate(ctx, contID, container.ExecOptions{
 		Tty:          true,
 		AttachStdin:  true,
 		AttachStderr: true,
@@ -137,7 +137,7 @@ func (st *dockerDialog) connect(contID string) {
 		st.win.showError(err)
 		return
 	}
-	attach, err := st.cli.ContainerExecAttach(ctx, execID.ID, types.ExecStartCheck{Tty: true})
+	attach, err := st.cli.ContainerExecAttach(ctx, execID.ID, container.ExecStartOptions{Tty: true})
 	if err != nil {
 		st.win.showError(err)
 		return
@@ -169,7 +169,7 @@ type dockerConn struct {
 func (c *dockerConn) Resize(cols, rows int) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	return c.cli.ContainerExecResize(ctx, c.execID, types.ResizeOptions{
+	return c.cli.ContainerExecResize(ctx, c.execID, container.ResizeOptions{
 		Width:  uint(cols),
 		Height: uint(rows),
 	})

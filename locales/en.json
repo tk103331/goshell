@@ -58,6 +58,8 @@
   "btnUseKey": "Use Key",
   "fieldServer": "Server",
   "fieldToken": "Token",
+  "fieldSecurity": "Security",
+  "insecureTLS": "Skip TLS verification (not recommended)",
 
   "valNameRequired": "Name is required.",
   "valHostRequired": "Host is required.",
@@ -83,6 +85,7 @@
   "editCommand": "Edit Command",
   "fieldCmdText": "Text",
   "fieldCmdIcon": "Icon",
+  "cmdAutoSubmit": "Auto-submit (press Enter after sending)",
   "cmdRequired": "Name and text are required.",
 
   "findSearching": "Searching…",

@@ -7,7 +7,7 @@ import "goshell/locales"
 // openNewCmd opens the dialog that creates a shortcut command.
 func (w *Window) openNewCmd() {
 	w.cmdEdit = -1
-	w.cmdName, w.cmdText, w.cmdIcon = "", "", ""
+	w.cmdName, w.cmdText, w.cmdIcon, w.cmdAutoSubmit = "", "", "", false
 	w.cmdOpen = true
 }
 
@@ -18,6 +18,7 @@ func (w *Window) editCmd(i int) {
 	}
 	w.cmdEdit = i
 	w.cmdName, w.cmdText, w.cmdIcon = w.cmds[i].Name, w.cmds[i].Text, w.cmds[i].Icon
+	w.cmdAutoSubmit = w.cmds[i].AutoSubmit
 	w.cmdOpen = true
 }
 
@@ -40,6 +41,9 @@ func (w *Window) cmdDialog(c *ui.Context) {
 				ui.Field(c, locales.FieldCmdIcon(), func() {
 					ui.Combobox(c, &w.cmdIcon, w.cmdIcons)
 				})
+				ui.Field(c, locales.CmdAutoSubmit(), func() {
+					ui.Checkbox(c, &w.cmdAutoSubmit, locales.CmdAutoSubmit())
+				})
 			})
 			if w.cmdName == "" || w.cmdText == "" {
 				ui.Text(c, locales.CmdRequired()).TextColor(c.Theme().TextMuted)
@@ -54,7 +58,12 @@ func (w *Window) cmdDialog(c *ui.Context) {
 					ok.Disabled(true)
 				}
 				if ok.Clicked() {
-					cmd := &Cmd{Name: w.cmdName, Text: w.cmdText, Icon: w.cmdIcon}
+					cmd := &Cmd{
+						Name:       w.cmdName,
+						Text:       w.cmdText,
+						Icon:       w.cmdIcon,
+						AutoSubmit: w.cmdAutoSubmit,
+					}
 					if w.cmdEdit >= 0 && w.cmdEdit < len(w.cmds) {
 						w.cmds[w.cmdEdit] = cmd
 						w.save()

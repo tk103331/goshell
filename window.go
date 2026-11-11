@@ -46,12 +46,13 @@ type Window struct {
 	pendingDock *DockerConfig
 	pendingK8S  *K8SConfig
 
-	cmdOpen  bool
-	cmdEdit  int // the command a modify dialog edits, -1 when creating
-	cmdName  string
-	cmdText  string
-	cmdIcon  string
-	cmdIcons []string
+	cmdOpen       bool
+	cmdEdit       int // the command a modify dialog edits, -1 when creating
+	cmdName       string
+	cmdText       string
+	cmdIcon       string
+	cmdAutoSubmit bool
+	cmdIcons      []string
 
 	// find
 	findOpen      bool // the find bar shows
@@ -656,6 +657,10 @@ func (w *Window) dialogs(c *ui.Context) {
 
 func (w *Window) sendCmd(cmd *Cmd) {
 	if tab := w.selectedTab(); tab != nil {
-		tab.term.Send([]byte(cmd.Text))
+		text := cmd.Text
+		if cmd.AutoSubmit {
+			text += "\n" // 自动提交：补一个回车
+		}
+		tab.term.Send([]byte(text))
 	}
 }

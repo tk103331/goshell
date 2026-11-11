@@ -574,6 +574,26 @@ func (msgs Messages) FieldToken() string {
 	return Catalog.Format(msgs.locale, "fieldToken", nil)
 }
 
+// FieldSecurity says "Security"
+// in the language the app shows.
+func FieldSecurity() string { return In(i18n.Locale()).FieldSecurity() }
+
+// FieldSecurity says "Security"
+// in the language of msgs.
+func (msgs Messages) FieldSecurity() string {
+	return Catalog.Format(msgs.locale, "fieldSecurity", nil)
+}
+
+// InsecureTLS says "Skip TLS verification (not recommended)"
+// in the language the app shows.
+func InsecureTLS() string { return In(i18n.Locale()).InsecureTLS() }
+
+// InsecureTLS says "Skip TLS verification (not recommended)"
+// in the language of msgs.
+func (msgs Messages) InsecureTLS() string {
+	return Catalog.Format(msgs.locale, "insecureTLS", nil)
+}
+
 // ValNameRequired says "Name is required."
 // in the language the app shows.
 func ValNameRequired() string { return In(i18n.Locale()).ValNameRequired() }
@@ -782,6 +802,16 @@ func FieldCmdIcon() string { return In(i18n.Locale()).FieldCmdIcon() }
 // in the language of msgs.
 func (msgs Messages) FieldCmdIcon() string {
 	return Catalog.Format(msgs.locale, "fieldCmdIcon", nil)
+}
+
+// CmdAutoSubmit says "Auto-submit (press Enter after sending)"
+// in the language the app shows.
+func CmdAutoSubmit() string { return In(i18n.Locale()).CmdAutoSubmit() }
+
+// CmdAutoSubmit says "Auto-submit (press Enter after sending)"
+// in the language of msgs.
+func (msgs Messages) CmdAutoSubmit() string {
+	return Catalog.Format(msgs.locale, "cmdAutoSubmit", nil)
 }
 
 // CmdRequired says "Name and text are required."

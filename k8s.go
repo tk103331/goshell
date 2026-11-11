@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"io"
+	"log"
 	"sync"
 	"time"
 
@@ -19,21 +20,54 @@ import (
 )
 
 type K8SConfigData struct {
-	Name   string `json:"name,omitempty"`
-	Type   string `json:"type,omitempty"`
-	Server string `json:"server,omitempty"`
-	Token  string `json:"token,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Type        string `json:"type,omitempty"`
+	Server      string `json:"server,omitempty"`
+	Token       string `json:"token,omitempty"`       // 加密存储
+	InsecureTLS bool   `json:"insecureTLS,omitempty"` // 是否跳过TLS验证（默认false）
+}
+
+// getToken 返回解密后的 token
+func (d *K8SConfigData) getToken() (string, error) {
+	return decryptString(d.Token)
+}
+
+// setToken 加密并设置 token
+func (d *K8SConfigData) setToken(token string) (string, error) {
+	encrypted, err := encryptString(token)
+	if err != nil {
+		return "", err
+	}
+	d.Token = encrypted
+	return encrypted, nil
 }
 
 type K8SConfig struct {
 	data *K8SConfigData
+
+	tokenPlain string // the token as the form edits it, encrypted on save
 }
 
 func (c *K8SConfig) Name() string      { return c.data.Name }
 func (c *K8SConfig) Type() string      { return "k8s" }
 func (c *K8SConfig) Data() interface{} { return c.data }
-func (c *K8SConfig) Apply()            { c.data.Type = c.Type() }
-func (c *K8SConfig) Prefill()          {}
+
+func (c *K8SConfig) Apply() {
+	c.data.Type = c.Type()
+	// a token typed in this session is encrypted; a blank one leaves the
+	// stored token alone, as when editing without retyping it
+	if c.tokenPlain != "" || c.data.Token == "" {
+		if _, err := c.data.setToken(c.tokenPlain); err != nil {
+			log.Printf("Failed to encrypt token: %v", err)
+			c.data.Token = c.tokenPlain
+		}
+	}
+}
+
+func (c *K8SConfig) Prefill() {
+	// tokens stay hidden when editing: retype to change one
+	c.tokenPlain = ""
+}
 
 func (c *K8SConfig) Validate() string {
 	if c.data.Name == "" {
@@ -42,7 +76,7 @@ func (c *K8SConfig) Validate() string {
 	if c.data.Server == "" {
 		return locales.ValServerRequired()
 	}
-	if c.data.Token == "" {
+	if c.data.Token == "" && c.tokenPlain == "" {
 		return locales.ValTokenRequired()
 	}
 	return ""
@@ -56,15 +90,28 @@ func (c *K8SConfig) Fields(ctx *ui.Context, editing bool, w *Window) {
 		}
 	})
 	ui.Field(ctx, locales.FieldServer(), func() { ui.TextInput(ctx, &c.data.Server) })
-	ui.Field(ctx, locales.FieldToken(), func() { ui.TextArea(ctx, &c.data.Token).Lines(3, 6) })
+	ui.Field(ctx, locales.FieldToken(), func() {
+		e := ui.TextArea(ctx, &c.tokenPlain).Lines(3, 6)
+		if editing {
+			e.Placeholder("••••••••")
+		}
+	})
+	ui.Field(ctx, locales.FieldSecurity(), func() {
+		ui.Checkbox(ctx, &c.data.InsecureTLS, locales.InsecureTLS())
+	})
 }
 
 func (c *K8SConfig) clientset() (*kubernetes.Clientset, error) {
+	// 获取解密后的 token
+	token, err := secretOf(c.data.Token)
+	if err != nil {
+		return nil, err
+	}
 	restCfg := &rest.Config{
 		Host:        c.data.Server,
-		BearerToken: c.data.Token,
+		BearerToken: token,
 		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: true,
+			Insecure: c.data.InsecureTLS, // 使用配置的设置，默认 false
 		},
 	}
 	return kubernetes.NewForConfig(restCfg)
@@ -200,11 +247,17 @@ func (st *k8sDialog) connect() {
 	if st.ns == "" || st.pod == "" || st.ct == "" {
 		return
 	}
+	// 获取解密后的 token
+	token, err := secretOf(st.cfg.data.Token)
+	if err != nil {
+		w.showError(err)
+		return
+	}
 	restCfg := &rest.Config{
 		Host:        st.cfg.data.Server,
-		BearerToken: st.cfg.data.Token,
+		BearerToken: token,
 		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: true,
+			Insecure: st.cfg.data.InsecureTLS, // 使用配置的设置，默认 false
 		},
 	}
 	req := st.cli.CoreV1().RESTClient().Post().
