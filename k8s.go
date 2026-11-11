@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/dialog"
-	"fyne.io/fyne/v2/widget"
-	"github.com/fyne-io/terminal"
+	"io"
+	"sync"
+	"time"
+
+	"github.com/egoist/mygo/plugins/terminal"
+	"github.com/egoist/mygo/ui"
 	"github.com/tk103331/stream"
+	"goshell/locales"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -23,214 +24,303 @@ type K8SConfigData struct {
 	Server string `json:"server,omitempty"`
 	Token  string `json:"token,omitempty"`
 }
+
 type K8SConfig struct {
 	data *K8SConfigData
-	onOk func()
 }
 
-func (c *K8SConfig) Name() string {
-	return c.data.Name
-}
+func (c *K8SConfig) Name() string      { return c.data.Name }
+func (c *K8SConfig) Type() string      { return "k8s" }
+func (c *K8SConfig) Data() interface{} { return c.data }
+func (c *K8SConfig) Apply()            { c.data.Type = c.Type() }
+func (c *K8SConfig) Prefill()          {}
 
-func (c *K8SConfig) Type() string {
-	return "k8s"
-}
-func (c *K8SConfig) Load(s string) error {
-	data := &K8SConfigData{}
-
-	err := json.Unmarshal([]byte(s), data)
-	if err != nil {
-		return err
+func (c *K8SConfig) Validate() string {
+	if c.data.Name == "" {
+		return locales.ValNameRequired()
 	}
-	c.data = data
-	return nil
-}
-func (c *K8SConfig) Data() interface{} {
-	return c.data
+	if c.data.Server == "" {
+		return locales.ValServerRequired()
+	}
+	if c.data.Token == "" {
+		return locales.ValTokenRequired()
+	}
+	return ""
 }
 
-func (c *K8SConfig) Form() *widget.Form {
-	nameEntry := widget.NewEntry()
-	serverEntry := widget.NewEntry()
-	tokenEntry := widget.NewEntry()
-	tokenEntry.MultiLine = true
-	tokenEntry.Wrapping = fyne.TextWrapBreak
-	data := c.data
-	if data != nil {
-		nameEntry.Text = data.Name
-		nameEntry.Disable()
-		serverEntry.Text = data.Server
-		tokenEntry.Text = data.Token
-	}
-	c.onOk = func() {
-		if c.data == nil {
-			c.data = &K8SConfigData{Type: c.Type()}
+func (c *K8SConfig) Fields(ctx *ui.Context, editing bool, w *Window) {
+	ui.Field(ctx, locales.FieldName(), func() {
+		e := ui.TextInput(ctx, &c.data.Name)
+		if editing {
+			e.ReadOnly(true)
 		}
-		c.data.Name = nameEntry.Text
-		c.data.Server = serverEntry.Text
-		c.data.Token = tokenEntry.Text
-	}
-	return widget.NewForm([]*widget.FormItem{
-		widget.NewFormItem("Name", nameEntry),
-		widget.NewFormItem("Server", serverEntry),
-		widget.NewFormItem("Token", tokenEntry),
-	}...)
+	})
+	ui.Field(ctx, locales.FieldServer(), func() { ui.TextInput(ctx, &c.data.Server) })
+	ui.Field(ctx, locales.FieldToken(), func() { ui.TextArea(ctx, &c.data.Token).Lines(3, 6) })
 }
 
-func (c *K8SConfig) OnOk() {
-	c.onOk()
-}
-
-type ExecOpt struct {
-	Namespace string
-	PodName   string
-	Container string
-}
-
-func (c *K8SConfig) Term(win *Window) {
-	cfg := c.data
+func (c *K8SConfig) clientset() (*kubernetes.Clientset, error) {
 	restCfg := &rest.Config{
-		Host:            cfg.Server,
-		BearerToken:     cfg.Token,
-		BearerTokenFile: "",
+		Host:        c.data.Server,
+		BearerToken: c.data.Token,
 		TLSClientConfig: rest.TLSClientConfig{
 			Insecure: true,
 		},
 	}
-	clientset, err := kubernetes.NewForConfig(restCfg)
+	return kubernetes.NewForConfig(restCfg)
+}
+
+func (c *K8SConfig) Term(w *Window) {
+	cli, err := c.clientset()
 	if err != nil {
-		win.showError(err)
+		w.showError(err)
 		return
 	}
-	namespaceList, err := clientset.CoreV1().Namespaces().List(context.Background(), metav1.ListOptions{})
-	if err != nil {
-		win.showError(err)
-		return
-	}
-	s, _ := stream.New(namespaceList.Items)
-	namespaces := make([]string, 0)
-	s.Map(func(n corev1.Namespace) string {
-		return n.ObjectMeta.Name
-	}).ToSlice(&namespaces)
+	st := &k8sDialog{win: w, cfg: c, cli: cli}
+	w.k8s = st
+	go st.loadNamespaces()
+}
 
-	execOpt := &ExecOpt{}
+// k8sDialog is the dialog that picks a pod's container to connect to.
+type k8sDialog struct {
+	win  *Window
+	open bool
+	cfg  *K8SConfig
+	cli  *kubernetes.Clientset
 
-	containerSelect := widget.NewSelect(namespaces, func(container string) {
-		execOpt.Container = container
+	namespaces []string
+	pods       []string
+	containers []string
+
+	ns, pod, ct string
+	err         error
+	loadingPods bool
+	loadingCTs  bool
+}
+
+func (st *k8sDialog) loadNamespaces() {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	list, err := st.cli.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
+	st.win.onMain(func() {
+		st.err = err
+		if err == nil {
+			s, _ := stream.New(list.Items)
+			s.Map(func(n corev1.Namespace) string {
+				return n.ObjectMeta.Name
+			}).ToSlice(&st.namespaces)
+		}
 	})
+}
 
-	podSelect := widget.NewSelect(namespaces, func(pod string) {
-		execOpt.PodName = pod
-		containerSelect.ClearSelected()
-		containerSelect.Options = []string{}
-
-		go func() {
-			pod, err2 := clientset.CoreV1().Pods(execOpt.Namespace).Get(context.Background(), pod, metav1.GetOptions{})
-			if err2 != nil {
-				win.showError(err2)
-				return
-			}
-			s, _ := stream.New(pod.Spec.Containers)
-			containers := make([]string, 0)
-			s.Map(func(n corev1.Container) string {
-				return n.Name
-			}).Limit(20).ToSlice(&containers)
-			containerSelect.Options = containers
-		}()
-
-	})
-
-	namespaceSelect := widget.NewSelect(namespaces, func(namespace string) {
-		execOpt.Namespace = namespace
-		podSelect.ClearSelected()
-		podSelect.Options = []string{}
-
-		go func() {
-			podList, err2 := clientset.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{})
-			if err2 != nil {
-				win.showError(err2)
-				return
-			}
-			s, _ := stream.New(podList.Items)
-			pods := make([]string, 0)
+func (st *k8sDialog) loadPods() {
+	st.win.onMain(func() { st.loadingPods = true })
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	list, err := st.cli.CoreV1().Pods(st.ns).List(ctx, metav1.ListOptions{})
+	st.win.onMain(func() {
+		st.err, st.loadingPods = err, false
+		if err == nil {
+			s, _ := stream.New(list.Items)
 			s.Map(func(n corev1.Pod) string {
 				return n.ObjectMeta.Name
-			}).Limit(20).ToSlice(&pods)
-			podSelect.Options = pods
-		}()
-	})
-	namespaceSelect.Resize(fyne.Size{Height: 200})
-
-	form := widget.NewForm(widget.NewFormItem("Namespace", namespaceSelect), widget.NewFormItem("Pod", podSelect), widget.NewFormItem("Container", containerSelect))
-	dlg := dialog.NewCustomConfirm("Select a container", "Connect", "Cancel", form, func(b bool) {
-		if b {
-			req := clientset.CoreV1().RESTClient().Post().
-				Resource("pods").
-				Name(execOpt.PodName).
-				Namespace(execOpt.Namespace).
-				SubResource("exec").
-				VersionedParams(&corev1.PodExecOptions{
-					Container: execOpt.Container,
-					Command:   []string{"bash"},
-					Stdin:     true,
-					Stdout:    true,
-					Stderr:    true,
-					TTY:       true,
-				}, scheme.ParameterCodec)
-
-			executor, err := remotecommand.NewSPDYExecutor(restCfg, "POST", req.URL())
-			if err != nil {
-				win.showError(err)
-				return
-			}
-
-			termCfgChan := make(chan terminal.Config)
-
-			term := NewTerm(execOpt.PodName, c)
-
-			writer, reader := term.StartWithPipe(func(err error) {
-				if err != nil {
-					fmt.Println(err.Error())
-					win.showError(err)
-				}
-			})
-
-			go func() {
-
-				err = executor.Stream(remotecommand.StreamOptions{
-					Stdin:             reader,
-					Stdout:            writer,
-					Stderr:            writer,
-					Tty:               true,
-					TerminalSizeQueue: TermConfigSizeQueue(termCfgChan),
-				})
-				if err != nil {
-					win.showError(err)
-					return
-				}
-			}()
-
-			term.AddConfigListener(func(config *terminal.Config) {
-				if config != nil {
-					go func() {
-						termCfgChan <- *config
-					}()
-				}
-			})
-			win.AddTermTab(term)
+			}).Limit(20).ToSlice(&st.pods)
 		}
-	}, win.win)
-	dlg.Resize(fyne.Size{Width: 400})
-	dlg.Show()
+	})
 }
 
-type TermConfigSizeQueue chan terminal.Config
-
-func (t TermConfigSizeQueue) Next() *remotecommand.TerminalSize {
-	cfg := <-t
-	return &remotecommand.TerminalSize{Width: uint16(cfg.Columns), Height: uint16(cfg.Rows)}
+func (st *k8sDialog) loadContainers() {
+	st.win.onMain(func() { st.loadingCTs = true })
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	pod, err := st.cli.CoreV1().Pods(st.ns).Get(ctx, st.pod, metav1.GetOptions{})
+	st.win.onMain(func() {
+		st.err, st.loadingCTs = err, false
+		if err == nil {
+			s, _ := stream.New(pod.Spec.Containers)
+			s.Map(func(n corev1.Container) string {
+				return n.Name
+			}).Limit(20).ToSlice(&st.containers)
+		}
+	})
 }
 
-func (t TermConfigSizeQueue) Send(cfg terminal.Config) {
-	t <- cfg
+func (st *k8sDialog) dialog(c *ui.Context) {
+	ui.Modal(c, &st.open, func() {
+		ui.Column(c).Width(460).Padding(16).Gap(12).Children(func() {
+			ui.Text(c, locales.DockerTitle())
+			if st.err != nil {
+				ui.Text(c, st.err.Error()).TextColor(c.Theme().Danger)
+			}
+			ui.Form(c, func() {
+				ui.Field(c, locales.FieldNamespace(), func() {
+					if ui.Select(c, &st.ns, st.namespaces).Changed() {
+						st.pods, st.pod, st.containers, st.ct = nil, "", nil, ""
+						go st.loadPods()
+					}
+				})
+				ui.Field(c, locales.FieldPod(), func() {
+					if ui.Select(c, &st.pod, st.pods).Changed() {
+						st.containers, st.ct = nil, ""
+						go st.loadContainers()
+					}
+				})
+				ui.Field(c, locales.FieldContainer(), func() {
+					ui.Select(c, &st.ct, st.containers)
+				})
+			})
+			switch {
+			case st.loadingPods || st.loadingCTs:
+				ui.Row(c).Gap(8).Children(func() {
+					ui.Spinner(c)
+					ui.Text(c, locales.K8sLoading())
+				})
+			case st.ns == "" || st.pod == "" || st.ct == "":
+				ui.Text(c, locales.K8sHint()).TextColor(c.Theme().TextMuted)
+			}
+			ui.Row(c).Gap(8).Children(func() {
+				ui.Spacer(c)
+				if ui.Button(c, locales.BtnCancel()).Clicked() {
+					st.open = false
+				}
+				ok := ui.PrimaryButton(c, locales.BtnConnect())
+				if st.ns == "" || st.pod == "" || st.ct == "" {
+					ok.Disabled(true)
+				}
+				if ok.Clicked() {
+					st.connect()
+				}
+			})
+		})
+	})
+}
+
+func (st *k8sDialog) connect() {
+	w := st.win
+	if st.ns == "" || st.pod == "" || st.ct == "" {
+		return
+	}
+	restCfg := &rest.Config{
+		Host:        st.cfg.data.Server,
+		BearerToken: st.cfg.data.Token,
+		TLSClientConfig: rest.TLSClientConfig{
+			Insecure: true,
+		},
+	}
+	req := st.cli.CoreV1().RESTClient().Post().
+		Resource("pods").
+		Name(st.pod).
+		Namespace(st.ns).
+		SubResource("exec").
+		VersionedParams(&corev1.PodExecOptions{
+			Container: st.ct,
+			Command:   []string{"bash"},
+			Stdin:     true,
+			Stdout:    true,
+			Stderr:    true,
+			TTY:       true,
+		}, scheme.ParameterCodec)
+
+	executor, err := remotecommand.NewSPDYExecutor(restCfg, "POST", req.URL())
+	if err != nil {
+		w.showError(err)
+		return
+	}
+
+	q := &sizeQueue{ch: make(chan *remotecommand.TerminalSize, 1)}
+	conn := newK8SConn(q)
+
+	tab, _, err := w.newTab(st.pod, st.cfg, func() { conn.Close() }, terminal.Options{Conn: conn})
+	if err != nil {
+		w.showError(err)
+		conn.Close()
+		return
+	}
+
+	go func() {
+		err := executor.Stream(remotecommand.StreamOptions{
+			Stdin:             conn.stdin,
+			Stdout:            conn.stdout,
+			Stderr:            conn.stdout,
+			Tty:               true,
+			TerminalSizeQueue: q,
+		})
+		if err != nil {
+			w.showError(err)
+		}
+	}()
+
+	w.onMain(func() {
+		st.open = false
+		w.addTermTab(tab)
+	})
+	w.showToast(locales.ToastConnected(st.pod), "success")
+}
+
+// sizeQueue tells the executor how big the terminal is; the terminal calls
+// the queue's Resize through k8sConn as its view resizes it.
+type sizeQueue struct {
+	ch chan *remotecommand.TerminalSize
+}
+
+func (q *sizeQueue) Resize(cols, rows int) error {
+	select {
+	case <-q.ch: // drop a size nobody read
+	default:
+	}
+	q.ch <- &remotecommand.TerminalSize{Width: uint16(cols), Height: uint16(rows)}
+	return nil
+}
+
+func (q *sizeQueue) Next() *remotecommand.TerminalSize {
+	return <-q.ch
+}
+
+// k8sConn connects a terminal to a K8S exec stream: what the terminal
+// writes the executor reads, what it writes the terminal shows, and a
+// resize of the view becomes a resize of the remote terminal.
+type k8sConn struct {
+	in  *io.PipeWriter // what the terminal writes, for the executor to read
+	out *io.PipeReader // what the executor wrote, for the terminal to show
+
+	stdin  io.ReadCloser // the read end of in, which the executor reads
+	stdout io.WriteCloser
+
+	q *sizeQueue
+
+	closeOnce sync.Once
+}
+
+func newK8SConn(q *sizeQueue) *k8sConn {
+	inReader, inWriter := io.Pipe()
+	outReader, outWriter := io.Pipe()
+	return &k8sConn{
+		in:     inWriter,
+		out:    outReader,
+		stdin:  inReader,
+		stdout: outWriter,
+		q:      q,
+	}
+}
+
+func (c *k8sConn) Read(p []byte) (int, error) {
+	return c.out.Read(p)
+}
+
+func (c *k8sConn) Write(p []byte) (int, error) {
+	return c.in.Write(p)
+}
+
+func (c *k8sConn) Resize(cols, rows int) error {
+	return c.q.Resize(cols, rows)
+}
+
+func (c *k8sConn) Close() error {
+	c.closeOnce.Do(func() {
+		c.in.Close()
+		c.out.Close()
+		c.stdin.Close()
+		c.stdout.Close()
+	})
+	return nil
 }

@@ -12,5 +12,11 @@
 *.out
 .idea
 cmd/goshell/goshell
+
+# MyGo build output (mygo build writes here, see mygo.json)
+dist/
+build/
+# macOS noise
+.DS_Store
 # Dependency directories (remove the comment below to include it)
 # vendor/
