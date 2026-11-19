@@ -6,6 +6,8 @@ import (
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/i18n"
+	"github.com/egoist/mygo/plugins/updater"
+	"github.com/egoist/mygo/plugins/updater/native"
 	"github.com/egoist/mygo/ui"
 	"goshell/locales"
 )
@@ -18,6 +20,8 @@ import (
 var iconPNG []byte
 
 func main() {
+	// the native update window, so GoShell's all-UI windows need no webview
+	mygo.Use(native.Plugin)
 	mygo.App.SetName(APP_NAME)
 	mygo.App.WhenReady(func() {
 		w := newWindow()
@@ -51,6 +55,10 @@ func main() {
 		// the system's appearance changed: rebuild the view, which the
 		// System appearance follows
 		mygo.Theme.OnUpdated(func() { w.onMain(func() {}) })
+
+		// a local Docker daemon, if one answers, gets a config of its own
+		// the first time it is found
+		w.detectLocalDocker()
 
 		w.openLocal()
 	})
@@ -109,6 +117,9 @@ func setMenus(w *Window) {
 
 	view := []*mygo.MenuItem{
 		{Label: locales.MenuAppearance(), Submenu: appearance},
+		{Label: locales.MenuToggleAppearance(), Accelerator: "{{SECRET_9px2wm4q}}", Click: func(*mygo.MenuItem, *mygo.Window) {
+			w.toggleAppearance()
+		}},
 		{Label: locales.MenuLanguage(), Submenu: language},
 		{Label: locales.MenuTerminalTheme(), Click: func(*mygo.MenuItem, *mygo.Window) {
 			w.openThemeDialog()
@@ -116,6 +127,9 @@ func setMenus(w *Window) {
 		mygo.Separator(),
 		{Label: locales.MenuToggleSidebar(), Accelerator: "CmdOrCtrl+B", Click: func(*mygo.MenuItem, *mygo.Window) {
 			w.toggleSidebar()
+		}},
+		{Label: locales.MenuToggleFiles(), Accelerator: "{{SECRET_f1les2bar}}", Click: func(*mygo.MenuItem, *mygo.Window) {
+			w.toggleFiles()
 		}},
 		mygo.Separator(),
 		{Label: locales.MenuFind(), Accelerator: "CmdOrCtrl+F", Click: func(*mygo.MenuItem, *mygo.Window) {
@@ -143,6 +157,8 @@ func setMenus(w *Window) {
 		{Role: mygo.RoleEditMenu},
 		{Label: locales.MenuView(), Submenu: view},
 		{Label: locales.MenuHelp(), Submenu: []*mygo.MenuItem{
+			updater.MenuItem(),
+			mygo.Separator(),
 			{Label: locales.MenuAbout(), Click: func(*mygo.MenuItem, *mygo.Window) {
 				w.aboutOpen = true
 			}},

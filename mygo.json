@@ -2,7 +2,7 @@
   "name": "Go Shell",
   "slug": "goshell",
   "identifier": "com.github.tk103331.goshell",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "linux": {
     "webview": false,
     "comment": "A simple terminal GUI client for SSH, Docker and K8S.",
@@ -11,5 +11,9 @@
   "i18n": {
     "dir": "locales",
     "source": "en"
+  },
+  "updates": {
+    "publicKey": "bg/wdJqQzAfjHNnASIMwiuDeqm1y+CbFMkcDaFdxivM=",
+    "github": "tk103331/goshell"
   }
 }

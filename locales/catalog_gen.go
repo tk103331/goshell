@@ -84,11 +84,21 @@ func (msgs Messages) MenuNewShell() string {
 	return Catalog.Format(msgs.locale, "menuNewShell", nil)
 }
 
-// MenuNewConfig says "New Config"
+// MenuNewSession says "New Session"
+// in the language the app shows.
+func MenuNewSession() string { return In(i18n.Locale()).MenuNewSession() }
+
+// MenuNewSession says "New Session"
+// in the language of msgs.
+func (msgs Messages) MenuNewSession() string {
+	return Catalog.Format(msgs.locale, "menuNewSession", nil)
+}
+
+// MenuNewConfig says "New Host"
 // in the language the app shows.
 func MenuNewConfig() string { return In(i18n.Locale()).MenuNewConfig() }
 
-// MenuNewConfig says "New Config"
+// MenuNewConfig says "New Host"
 // in the language of msgs.
 func (msgs Messages) MenuNewConfig() string {
 	return Catalog.Format(msgs.locale, "menuNewConfig", nil)
@@ -104,11 +114,11 @@ func (msgs Messages) MenuNewCommand() string {
 	return Catalog.Format(msgs.locale, "menuNewCommand", nil)
 }
 
-// MenuCloseTab says "Close Tab"
+// MenuCloseTab says "Close Session"
 // in the language the app shows.
 func MenuCloseTab() string { return In(i18n.Locale()).MenuCloseTab() }
 
-// MenuCloseTab says "Close Tab"
+// MenuCloseTab says "Close Session"
 // in the language of msgs.
 func (msgs Messages) MenuCloseTab() string {
 	return Catalog.Format(msgs.locale, "menuCloseTab", nil)
@@ -132,6 +142,16 @@ func MenuAppearance() string { return In(i18n.Locale()).MenuAppearance() }
 // in the language of msgs.
 func (msgs Messages) MenuAppearance() string {
 	return Catalog.Format(msgs.locale, "menuAppearance", nil)
+}
+
+// MenuToggleAppearance says "Toggle Light/Dark"
+// in the language the app shows.
+func MenuToggleAppearance() string { return In(i18n.Locale()).MenuToggleAppearance() }
+
+// MenuToggleAppearance says "Toggle Light/Dark"
+// in the language of msgs.
+func (msgs Messages) MenuToggleAppearance() string {
+	return Catalog.Format(msgs.locale, "menuToggleAppearance", nil)
 }
 
 // MenuLanguage says "Language"
@@ -184,6 +204,26 @@ func (msgs Messages) MenuTerminalTheme() string {
 	return Catalog.Format(msgs.locale, "menuTerminalTheme", nil)
 }
 
+// SwitchToDark says "Switch to dark"
+// in the language the app shows.
+func SwitchToDark() string { return In(i18n.Locale()).SwitchToDark() }
+
+// SwitchToDark says "Switch to dark"
+// in the language of msgs.
+func (msgs Messages) SwitchToDark() string {
+	return Catalog.Format(msgs.locale, "switchToDark", nil)
+}
+
+// SwitchToLight says "Switch to light"
+// in the language the app shows.
+func SwitchToLight() string { return In(i18n.Locale()).SwitchToLight() }
+
+// SwitchToLight says "Switch to light"
+// in the language of msgs.
+func (msgs Messages) SwitchToLight() string {
+	return Catalog.Format(msgs.locale, "switchToLight", nil)
+}
+
 // MenuToggleSidebar says "Toggle Sidebar"
 // in the language the app shows.
 func MenuToggleSidebar() string { return In(i18n.Locale()).MenuToggleSidebar() }
@@ -234,44 +274,114 @@ func (msgs Messages) WinClose() string {
 	return Catalog.Format(msgs.locale, "winClose", nil)
 }
 
-// SidebarTitle says "Sessions"
+// SidebarTitle says "Hosts"
 // in the language the app shows.
 func SidebarTitle() string { return In(i18n.Locale()).SidebarTitle() }
 
-// SidebarTitle says "Sessions"
+// SidebarTitle says "Hosts"
 // in the language of msgs.
 func (msgs Messages) SidebarTitle() string {
 	return Catalog.Format(msgs.locale, "sidebarTitle", nil)
 }
 
-// SidebarEmpty1 says "No sessions yet."
+// LocalHostName says "LOCAL"
+// in the language the app shows.
+func LocalHostName() string { return In(i18n.Locale()).LocalHostName() }
+
+// LocalHostName says "LOCAL"
+// in the language of msgs.
+func (msgs Messages) LocalHostName() string {
+	return Catalog.Format(msgs.locale, "localHostName", nil)
+}
+
+// LocalHostDetail says "This machine"
+// in the language the app shows.
+func LocalHostDetail() string { return In(i18n.Locale()).LocalHostDetail() }
+
+// LocalHostDetail says "This machine"
+// in the language of msgs.
+func (msgs Messages) LocalHostDetail() string {
+	return Catalog.Format(msgs.locale, "localHostDetail", nil)
+}
+
+// LocalHostHint says "Use + to start a session."
+// in the language the app shows.
+func LocalHostHint() string { return In(i18n.Locale()).LocalHostHint() }
+
+// LocalHostHint says "Use + to start a session."
+// in the language of msgs.
+func (msgs Messages) LocalHostHint() string {
+	return Catalog.Format(msgs.locale, "localHostHint", nil)
+}
+
+// SidebarEmpty1 says "No hosts yet."
 // in the language the app shows.
 func SidebarEmpty1() string { return In(i18n.Locale()).SidebarEmpty1() }
 
-// SidebarEmpty1 says "No sessions yet."
+// SidebarEmpty1 says "No hosts yet."
 // in the language of msgs.
 func (msgs Messages) SidebarEmpty1() string {
 	return Catalog.Format(msgs.locale, "sidebarEmpty1", nil)
 }
 
-// SidebarEmpty2 says "Click + to add an SSH, Docker or K8S session."
+// SidebarEmpty2 says "Click + to add an SSH, Docker or K8S host."
 // in the language the app shows.
 func SidebarEmpty2() string { return In(i18n.Locale()).SidebarEmpty2() }
 
-// SidebarEmpty2 says "Click + to add an SSH, Docker or K8S session."
+// SidebarEmpty2 says "Click + to add an SSH, Docker or K8S host."
 // in the language of msgs.
 func (msgs Messages) SidebarEmpty2() string {
 	return Catalog.Format(msgs.locale, "sidebarEmpty2", nil)
 }
 
-// EmptyTerminals says "No open terminals."
+// SidebarSearch says "Search hosts and sessions"
+// in the language the app shows.
+func SidebarSearch() string { return In(i18n.Locale()).SidebarSearch() }
+
+// SidebarSearch says "Search hosts and sessions"
+// in the language of msgs.
+func (msgs Messages) SidebarSearch() string {
+	return Catalog.Format(msgs.locale, "sidebarSearch", nil)
+}
+
+// SidebarNoMatch says "No matching hosts or sessions."
+// in the language the app shows.
+func SidebarNoMatch() string { return In(i18n.Locale()).SidebarNoMatch() }
+
+// SidebarNoMatch says "No matching hosts or sessions."
+// in the language of msgs.
+func (msgs Messages) SidebarNoMatch() string {
+	return Catalog.Format(msgs.locale, "sidebarNoMatch", nil)
+}
+
+// HostOpenSessions says "{count, plural, one {# open session} other {# open sessions}}"
+// in the language the app shows.
+func HostOpenSessions(count int) string { return In(i18n.Locale()).HostOpenSessions(count) }
+
+// HostOpenSessions says "{count, plural, one {# open session} other {# open sessions}}"
+// in the language of msgs.
+func (msgs Messages) HostOpenSessions(count int) string {
+	return Catalog.Format(msgs.locale, "hostOpenSessions", map[string]any{"count": count})
+}
+
+// EmptyTerminals says "No open sessions."
 // in the language the app shows.
 func EmptyTerminals() string { return In(i18n.Locale()).EmptyTerminals() }
 
-// EmptyTerminals says "No open terminals."
+// EmptyTerminals says "No open sessions."
 // in the language of msgs.
 func (msgs Messages) EmptyTerminals() string {
 	return Catalog.Format(msgs.locale, "emptyTerminals", nil)
+}
+
+// EmptyTerminalsDetail says "Start a session on a host in the sidebar, or press +."
+// in the language the app shows.
+func EmptyTerminalsDetail() string { return In(i18n.Locale()).EmptyTerminalsDetail() }
+
+// EmptyTerminalsDetail says "Start a session on a host in the sidebar, or press +."
+// in the language of msgs.
+func (msgs Messages) EmptyTerminalsDetail() string {
+	return Catalog.Format(msgs.locale, "emptyTerminalsDetail", nil)
 }
 
 // TooltipOpen says "Open"
@@ -304,21 +414,21 @@ func (msgs Messages) TooltipDelete() string {
 	return Catalog.Format(msgs.locale, "tooltipDelete", nil)
 }
 
-// TooltipNewConfig says "New Config"
+// TooltipNewConfig says "New Host"
 // in the language the app shows.
 func TooltipNewConfig() string { return In(i18n.Locale()).TooltipNewConfig() }
 
-// TooltipNewConfig says "New Config"
+// TooltipNewConfig says "New Host"
 // in the language of msgs.
 func (msgs Messages) TooltipNewConfig() string {
 	return Catalog.Format(msgs.locale, "tooltipNewConfig", nil)
 }
 
-// TooltipCloseTab says "Close tab"
+// TooltipCloseTab says "Close session"
 // in the language the app shows.
 func TooltipCloseTab() string { return In(i18n.Locale()).TooltipCloseTab() }
 
-// TooltipCloseTab says "Close tab"
+// TooltipCloseTab says "Close session"
 // in the language of msgs.
 func (msgs Messages) TooltipCloseTab() string {
 	return Catalog.Format(msgs.locale, "tooltipCloseTab", nil)
@@ -374,6 +484,176 @@ func (msgs Messages) TooltipToggleSidebar() string {
 	return Catalog.Format(msgs.locale, "tooltipToggleSidebar", nil)
 }
 
+// MenuToggleFiles says "Toggle File Sidebar"
+// in the language the app shows.
+func MenuToggleFiles() string { return In(i18n.Locale()).MenuToggleFiles() }
+
+// MenuToggleFiles says "Toggle File Sidebar"
+// in the language of msgs.
+func (msgs Messages) MenuToggleFiles() string {
+	return Catalog.Format(msgs.locale, "menuToggleFiles", nil)
+}
+
+// TooltipToggleFiles says "Toggle file sidebar"
+// in the language the app shows.
+func TooltipToggleFiles() string { return In(i18n.Locale()).TooltipToggleFiles() }
+
+// TooltipToggleFiles says "Toggle file sidebar"
+// in the language of msgs.
+func (msgs Messages) TooltipToggleFiles() string {
+	return Catalog.Format(msgs.locale, "tooltipToggleFiles", nil)
+}
+
+// FilesTitle says "Files"
+// in the language the app shows.
+func FilesTitle() string { return In(i18n.Locale()).FilesTitle() }
+
+// FilesTitle says "Files"
+// in the language of msgs.
+func (msgs Messages) FilesTitle() string {
+	return Catalog.Format(msgs.locale, "filesTitle", nil)
+}
+
+// FilesFollow says "Follow"
+// in the language the app shows.
+func FilesFollow() string { return In(i18n.Locale()).FilesFollow() }
+
+// FilesFollow says "Follow"
+// in the language of msgs.
+func (msgs Messages) FilesFollow() string {
+	return Catalog.Format(msgs.locale, "filesFollow", nil)
+}
+
+// FilesFollowTip says "Follow the terminal's current directory"
+// in the language the app shows.
+func FilesFollowTip() string { return In(i18n.Locale()).FilesFollowTip() }
+
+// FilesFollowTip says "Follow the terminal's current directory"
+// in the language of msgs.
+func (msgs Messages) FilesFollowTip() string {
+	return Catalog.Format(msgs.locale, "filesFollowTip", nil)
+}
+
+// FilesEmpty says "This folder is empty."
+// in the language the app shows.
+func FilesEmpty() string { return In(i18n.Locale()).FilesEmpty() }
+
+// FilesEmpty says "This folder is empty."
+// in the language of msgs.
+func (msgs Messages) FilesEmpty() string {
+	return Catalog.Format(msgs.locale, "filesEmpty", nil)
+}
+
+// FilesLoading says "Loading…"
+// in the language the app shows.
+func FilesLoading() string { return In(i18n.Locale()).FilesLoading() }
+
+// FilesLoading says "Loading…"
+// in the language of msgs.
+func (msgs Messages) FilesLoading() string {
+	return Catalog.Format(msgs.locale, "filesLoading", nil)
+}
+
+// FilesUp says "Parent folder"
+// in the language the app shows.
+func FilesUp() string { return In(i18n.Locale()).FilesUp() }
+
+// FilesUp says "Parent folder"
+// in the language of msgs.
+func (msgs Messages) FilesUp() string {
+	return Catalog.Format(msgs.locale, "filesUp", nil)
+}
+
+// FilesRefresh says "Refresh"
+// in the language the app shows.
+func FilesRefresh() string { return In(i18n.Locale()).FilesRefresh() }
+
+// FilesRefresh says "Refresh"
+// in the language of msgs.
+func (msgs Messages) FilesRefresh() string {
+	return Catalog.Format(msgs.locale, "filesRefresh", nil)
+}
+
+// FilesClose says "Close"
+// in the language the app shows.
+func FilesClose() string { return In(i18n.Locale()).FilesClose() }
+
+// FilesClose says "Close"
+// in the language of msgs.
+func (msgs Messages) FilesClose() string {
+	return Catalog.Format(msgs.locale, "filesClose", nil)
+}
+
+// FilesRetry says "Try again"
+// in the language the app shows.
+func FilesRetry() string { return In(i18n.Locale()).FilesRetry() }
+
+// FilesRetry says "Try again"
+// in the language of msgs.
+func (msgs Messages) FilesRetry() string {
+	return Catalog.Format(msgs.locale, "filesRetry", nil)
+}
+
+// FilesUnavailable says "Files are not available for this session."
+// in the language the app shows.
+func FilesUnavailable() string { return In(i18n.Locale()).FilesUnavailable() }
+
+// FilesUnavailable says "Files are not available for this session."
+// in the language of msgs.
+func (msgs Messages) FilesUnavailable() string {
+	return Catalog.Format(msgs.locale, "filesUnavailable", nil)
+}
+
+// ProgramStatusBlocked says "Needs you"
+// in the language the app shows.
+func ProgramStatusBlocked() string { return In(i18n.Locale()).ProgramStatusBlocked() }
+
+// ProgramStatusBlocked says "Needs you"
+// in the language of msgs.
+func (msgs Messages) ProgramStatusBlocked() string {
+	return Catalog.Format(msgs.locale, "programStatusBlocked", nil)
+}
+
+// ProgramStatusWorking says "Working"
+// in the language the app shows.
+func ProgramStatusWorking() string { return In(i18n.Locale()).ProgramStatusWorking() }
+
+// ProgramStatusWorking says "Working"
+// in the language of msgs.
+func (msgs Messages) ProgramStatusWorking() string {
+	return Catalog.Format(msgs.locale, "programStatusWorking", nil)
+}
+
+// ProgramStatusDone says "Done"
+// in the language the app shows.
+func ProgramStatusDone() string { return In(i18n.Locale()).ProgramStatusDone() }
+
+// ProgramStatusDone says "Done"
+// in the language of msgs.
+func (msgs Messages) ProgramStatusDone() string {
+	return Catalog.Format(msgs.locale, "programStatusDone", nil)
+}
+
+// ProgramStatusError says "Failed"
+// in the language the app shows.
+func ProgramStatusError() string { return In(i18n.Locale()).ProgramStatusError() }
+
+// ProgramStatusError says "Failed"
+// in the language of msgs.
+func (msgs Messages) ProgramStatusError() string {
+	return Catalog.Format(msgs.locale, "programStatusError", nil)
+}
+
+// ProgramStatusDismiss says "Dismiss"
+// in the language the app shows.
+func ProgramStatusDismiss() string { return In(i18n.Locale()).ProgramStatusDismiss() }
+
+// ProgramStatusDismiss says "Dismiss"
+// in the language of msgs.
+func (msgs Messages) ProgramStatusDismiss() string {
+	return Catalog.Format(msgs.locale, "programStatusDismiss", nil)
+}
+
 // DeleteTitle says "Delete “{name}”?"
 // in the language the app shows.
 func DeleteTitle(name string) string { return In(i18n.Locale()).DeleteTitle(name) }
@@ -384,11 +664,11 @@ func (msgs Messages) DeleteTitle(name string) string {
 	return Catalog.Format(msgs.locale, "deleteTitle", map[string]any{"name": name})
 }
 
-// DeleteSessionMsg says "The session will be removed from the sidebar. You can't undo this."
+// DeleteSessionMsg says "The host will be removed from the sidebar. You can't undo this."
 // in the language the app shows.
 func DeleteSessionMsg() string { return In(i18n.Locale()).DeleteSessionMsg() }
 
-// DeleteSessionMsg says "The session will be removed from the sidebar. You can't undo this."
+// DeleteSessionMsg says "The host will be removed from the sidebar. You can't undo this."
 // in the language of msgs.
 func (msgs Messages) DeleteSessionMsg() string {
 	return Catalog.Format(msgs.locale, "deleteSessionMsg", nil)
@@ -424,21 +704,21 @@ func (msgs Messages) BtnDelete() string {
 	return Catalog.Format(msgs.locale, "btnDelete", nil)
 }
 
-// CreateConfig says "Create Config"
+// CreateConfig says "Add Host"
 // in the language the app shows.
 func CreateConfig() string { return In(i18n.Locale()).CreateConfig() }
 
-// CreateConfig says "Create Config"
+// CreateConfig says "Add Host"
 // in the language of msgs.
 func (msgs Messages) CreateConfig() string {
 	return Catalog.Format(msgs.locale, "createConfig", nil)
 }
 
-// ModifyConfig says "Modify Config: {name}"
+// ModifyConfig says "Edit Host: {name}"
 // in the language the app shows.
 func ModifyConfig(name string) string { return In(i18n.Locale()).ModifyConfig(name) }
 
-// ModifyConfig says "Modify Config: {name}"
+// ModifyConfig says "Edit Host: {name}"
 // in the language of msgs.
 func (msgs Messages) ModifyConfig(name string) string {
 	return Catalog.Format(msgs.locale, "modifyConfig", map[string]any{"name": name})
@@ -452,6 +732,46 @@ func FieldType() string { return In(i18n.Locale()).FieldType() }
 // in the language of msgs.
 func (msgs Messages) FieldType() string {
 	return Catalog.Format(msgs.locale, "fieldType", nil)
+}
+
+// HostKindHint says "Choose how GoShell connects."
+// in the language the app shows.
+func HostKindHint() string { return In(i18n.Locale()).HostKindHint() }
+
+// HostKindHint says "Choose how GoShell connects."
+// in the language of msgs.
+func (msgs Messages) HostKindHint() string {
+	return Catalog.Format(msgs.locale, "hostKindHint", nil)
+}
+
+// HostKindSSH says "Remote shell over SSH"
+// in the language the app shows.
+func HostKindSSH() string { return In(i18n.Locale()).HostKindSSH() }
+
+// HostKindSSH says "Remote shell over SSH"
+// in the language of msgs.
+func (msgs Messages) HostKindSSH() string {
+	return Catalog.Format(msgs.locale, "hostKindSSH", nil)
+}
+
+// HostKindDocker says "Shell inside a container"
+// in the language the app shows.
+func HostKindDocker() string { return In(i18n.Locale()).HostKindDocker() }
+
+// HostKindDocker says "Shell inside a container"
+// in the language of msgs.
+func (msgs Messages) HostKindDocker() string {
+	return Catalog.Format(msgs.locale, "hostKindDocker", nil)
+}
+
+// HostKindK8S says "Shell inside a pod"
+// in the language the app shows.
+func HostKindK8S() string { return In(i18n.Locale()).HostKindK8S() }
+
+// HostKindK8S says "Shell inside a pod"
+// in the language of msgs.
+func (msgs Messages) HostKindK8S() string {
+	return Catalog.Format(msgs.locale, "hostKindK8S", nil)
 }
 
 // FieldName says "Name"
@@ -564,6 +884,96 @@ func (msgs Messages) FieldServer() string {
 	return Catalog.Format(msgs.locale, "fieldServer", nil)
 }
 
+// FieldK8sSource says "Connection"
+// in the language the app shows.
+func FieldK8sSource() string { return In(i18n.Locale()).FieldK8sSource() }
+
+// FieldK8sSource says "Connection"
+// in the language of msgs.
+func (msgs Messages) FieldK8sSource() string {
+	return Catalog.Format(msgs.locale, "fieldK8sSource", nil)
+}
+
+// K8sSourceKubeconfig says "Kubeconfig"
+// in the language the app shows.
+func K8sSourceKubeconfig() string { return In(i18n.Locale()).K8sSourceKubeconfig() }
+
+// K8sSourceKubeconfig says "Kubeconfig"
+// in the language of msgs.
+func (msgs Messages) K8sSourceKubeconfig() string {
+	return Catalog.Format(msgs.locale, "k8sSourceKubeconfig", nil)
+}
+
+// K8sSourceToken says "Server + Token"
+// in the language the app shows.
+func K8sSourceToken() string { return In(i18n.Locale()).K8sSourceToken() }
+
+// K8sSourceToken says "Server + Token"
+// in the language of msgs.
+func (msgs Messages) K8sSourceToken() string {
+	return Catalog.Format(msgs.locale, "k8sSourceToken", nil)
+}
+
+// FieldKubeconfig says "Kubeconfig file"
+// in the language the app shows.
+func FieldKubeconfig() string { return In(i18n.Locale()).FieldKubeconfig() }
+
+// FieldKubeconfig says "Kubeconfig file"
+// in the language of msgs.
+func (msgs Messages) FieldKubeconfig() string {
+	return Catalog.Format(msgs.locale, "fieldKubeconfig", nil)
+}
+
+// FieldKubeContext says "Context (optional)"
+// in the language the app shows.
+func FieldKubeContext() string { return In(i18n.Locale()).FieldKubeContext() }
+
+// FieldKubeContext says "Context (optional)"
+// in the language of msgs.
+func (msgs Messages) FieldKubeContext() string {
+	return Catalog.Format(msgs.locale, "fieldKubeContext", nil)
+}
+
+// KubeContextPlaceholder says "Current context by default"
+// in the language the app shows.
+func KubeContextPlaceholder() string { return In(i18n.Locale()).KubeContextPlaceholder() }
+
+// KubeContextPlaceholder says "Current context by default"
+// in the language of msgs.
+func (msgs Messages) KubeContextPlaceholder() string {
+	return Catalog.Format(msgs.locale, "kubeContextPlaceholder", nil)
+}
+
+// BtnChooseKubeconfig says "Choose…"
+// in the language the app shows.
+func BtnChooseKubeconfig() string { return In(i18n.Locale()).BtnChooseKubeconfig() }
+
+// BtnChooseKubeconfig says "Choose…"
+// in the language of msgs.
+func (msgs Messages) BtnChooseKubeconfig() string {
+	return Catalog.Format(msgs.locale, "btnChooseKubeconfig", nil)
+}
+
+// ChooseKubeconfigTitle says "Choose a kubeconfig"
+// in the language the app shows.
+func ChooseKubeconfigTitle() string { return In(i18n.Locale()).ChooseKubeconfigTitle() }
+
+// ChooseKubeconfigTitle says "Choose a kubeconfig"
+// in the language of msgs.
+func (msgs Messages) ChooseKubeconfigTitle() string {
+	return Catalog.Format(msgs.locale, "chooseKubeconfigTitle", nil)
+}
+
+// BtnUseKubeconfig says "Use Kubeconfig"
+// in the language the app shows.
+func BtnUseKubeconfig() string { return In(i18n.Locale()).BtnUseKubeconfig() }
+
+// BtnUseKubeconfig says "Use Kubeconfig"
+// in the language of msgs.
+func (msgs Messages) BtnUseKubeconfig() string {
+	return Catalog.Format(msgs.locale, "btnUseKubeconfig", nil)
+}
+
 // FieldToken says "Token"
 // in the language the app shows.
 func FieldToken() string { return In(i18n.Locale()).FieldToken() }
@@ -622,6 +1032,26 @@ func ValServerRequired() string { return In(i18n.Locale()).ValServerRequired() }
 // in the language of msgs.
 func (msgs Messages) ValServerRequired() string {
 	return Catalog.Format(msgs.locale, "valServerRequired", nil)
+}
+
+// ValKubeconfigRequired says "Kubeconfig file is required."
+// in the language the app shows.
+func ValKubeconfigRequired() string { return In(i18n.Locale()).ValKubeconfigRequired() }
+
+// ValKubeconfigRequired says "Kubeconfig file is required."
+// in the language of msgs.
+func (msgs Messages) ValKubeconfigRequired() string {
+	return Catalog.Format(msgs.locale, "valKubeconfigRequired", nil)
+}
+
+// ValKubeconfigNotFound says "Kubeconfig file not found: {path}"
+// in the language the app shows.
+func ValKubeconfigNotFound(path string) string { return In(i18n.Locale()).ValKubeconfigNotFound(path) }
+
+// ValKubeconfigNotFound says "Kubeconfig file not found: {path}"
+// in the language of msgs.
+func (msgs Messages) ValKubeconfigNotFound(path string) string {
+	return Catalog.Format(msgs.locale, "valKubeconfigNotFound", map[string]any{"path": path})
 }
 
 // ValTokenRequired says "Token is required."
@@ -684,6 +1114,26 @@ func (msgs Messages) BtnConnect() string {
 	return Catalog.Format(msgs.locale, "btnConnect", nil)
 }
 
+// BtnRefresh says "Refresh"
+// in the language the app shows.
+func BtnRefresh() string { return In(i18n.Locale()).BtnRefresh() }
+
+// BtnRefresh says "Refresh"
+// in the language of msgs.
+func (msgs Messages) BtnRefresh() string {
+	return Catalog.Format(msgs.locale, "btnRefresh", nil)
+}
+
+// BtnRetry says "Retry"
+// in the language the app shows.
+func BtnRetry() string { return In(i18n.Locale()).BtnRetry() }
+
+// BtnRetry says "Retry"
+// in the language of msgs.
+func (msgs Messages) BtnRetry() string {
+	return Catalog.Format(msgs.locale, "btnRetry", nil)
+}
+
 // DockerTitle says "Select a container"
 // in the language the app shows.
 func DockerTitle() string { return In(i18n.Locale()).DockerTitle() }
@@ -692,6 +1142,46 @@ func DockerTitle() string { return In(i18n.Locale()).DockerTitle() }
 // in the language of msgs.
 func (msgs Messages) DockerTitle() string {
 	return Catalog.Format(msgs.locale, "dockerTitle", nil)
+}
+
+// DockerSearch says "Search containers"
+// in the language the app shows.
+func DockerSearch() string { return In(i18n.Locale()).DockerSearch() }
+
+// DockerSearch says "Search containers"
+// in the language of msgs.
+func (msgs Messages) DockerSearch() string {
+	return Catalog.Format(msgs.locale, "dockerSearch", nil)
+}
+
+// DockerNoMatch says "No matching containers."
+// in the language the app shows.
+func DockerNoMatch() string { return In(i18n.Locale()).DockerNoMatch() }
+
+// DockerNoMatch says "No matching containers."
+// in the language of msgs.
+func (msgs Messages) DockerNoMatch() string {
+	return Catalog.Format(msgs.locale, "dockerNoMatch", nil)
+}
+
+// DockerHint says "Select a container to open a shell."
+// in the language the app shows.
+func DockerHint() string { return In(i18n.Locale()).DockerHint() }
+
+// DockerHint says "Select a container to open a shell."
+// in the language of msgs.
+func (msgs Messages) DockerHint() string {
+	return Catalog.Format(msgs.locale, "dockerHint", nil)
+}
+
+// LocalDockerName says "Local Docker"
+// in the language the app shows.
+func LocalDockerName() string { return In(i18n.Locale()).LocalDockerName() }
+
+// LocalDockerName says "Local Docker"
+// in the language of msgs.
+func (msgs Messages) LocalDockerName() string {
+	return Catalog.Format(msgs.locale, "localDockerName", nil)
 }
 
 // DockerLoading says "Loading containers…"
@@ -742,6 +1232,16 @@ func FieldContainer() string { return In(i18n.Locale()).FieldContainer() }
 // in the language of msgs.
 func (msgs Messages) FieldContainer() string {
 	return Catalog.Format(msgs.locale, "fieldContainer", nil)
+}
+
+// K8sTitle says "Connect to Kubernetes"
+// in the language the app shows.
+func K8sTitle() string { return In(i18n.Locale()).K8sTitle() }
+
+// K8sTitle says "Connect to Kubernetes"
+// in the language of msgs.
+func (msgs Messages) K8sTitle() string {
+	return Catalog.Format(msgs.locale, "k8sTitle", nil)
 }
 
 // K8sLoading says "Loading…"
@@ -804,6 +1304,16 @@ func (msgs Messages) FieldCmdIcon() string {
 	return Catalog.Format(msgs.locale, "fieldCmdIcon", nil)
 }
 
+// FieldAfterSend says "After sending"
+// in the language the app shows.
+func FieldAfterSend() string { return In(i18n.Locale()).FieldAfterSend() }
+
+// FieldAfterSend says "After sending"
+// in the language of msgs.
+func (msgs Messages) FieldAfterSend() string {
+	return Catalog.Format(msgs.locale, "fieldAfterSend", nil)
+}
+
 // CmdAutoSubmit says "Auto-submit (press Enter after sending)"
 // in the language the app shows.
 func CmdAutoSubmit() string { return In(i18n.Locale()).CmdAutoSubmit() }
@@ -812,6 +1322,26 @@ func CmdAutoSubmit() string { return In(i18n.Locale()).CmdAutoSubmit() }
 // in the language of msgs.
 func (msgs Messages) CmdAutoSubmit() string {
 	return Catalog.Format(msgs.locale, "cmdAutoSubmit", nil)
+}
+
+// CmdPreviewPlaceholder says "Command preview"
+// in the language the app shows.
+func CmdPreviewPlaceholder() string { return In(i18n.Locale()).CmdPreviewPlaceholder() }
+
+// CmdPreviewPlaceholder says "Command preview"
+// in the language of msgs.
+func (msgs Messages) CmdPreviewPlaceholder() string {
+	return Catalog.Format(msgs.locale, "cmdPreviewPlaceholder", nil)
+}
+
+// CmdHint says "Sent to the focused terminal."
+// in the language the app shows.
+func CmdHint() string { return In(i18n.Locale()).CmdHint() }
+
+// CmdHint says "Sent to the focused terminal."
+// in the language of msgs.
+func (msgs Messages) CmdHint() string {
+	return Catalog.Format(msgs.locale, "cmdHint", nil)
 }
 
 // CmdRequired says "Name and text are required."

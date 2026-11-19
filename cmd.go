@@ -1,13 +1,16 @@
 package main
 
-import "github.com/egoist/mygo/ui"
+import (
+	"strings"
 
-import "goshell/locales"
+	"github.com/egoist/mygo/ui"
+	"goshell/locales"
+)
 
 // openNewCmd opens the dialog that creates a shortcut command.
 func (w *Window) openNewCmd() {
 	w.cmdEdit = -1
-	w.cmdName, w.cmdText, w.cmdIcon, w.cmdAutoSubmit = "", "", "", false
+	w.cmdName, w.cmdText, w.cmdIcon, w.cmdAutoSubmit = "", "", "terminal", false
 	w.cmdOpen = true
 }
 
@@ -28,26 +31,75 @@ func (w *Window) addCmd(cmd *Cmd) {
 }
 
 func (w *Window) cmdDialog(c *ui.Context) {
+	lk := lookFor(c)
 	ui.Modal(c, &w.cmdOpen, func() {
 		title := locales.NewCommand()
 		if w.cmdEdit >= 0 {
 			title = locales.EditCommand()
 		}
-		ui.Column(c).Width(460).Padding(16).Gap(12).Children(func() {
-			ui.Text(c, title)
+		ui.Column(c).Width(520).Padding(20).Gap(14).Children(func() {
+			dialogHeading(c, title)
+
+			// the chip this command makes in the bar under the terminal
+			ui.Row(c).FillWidth().Height(38).Padding(0, 10).Gap(6).Radius(8).
+				Background(lk.chip).Children(func() {
+				if icon := cmdIcon(w.cmdIcon); icon != nil {
+					ui.Icon(c, icon).Size(14, 14).TextColor(lk.textMuted)
+				}
+				name := w.cmdName
+				fg := lk.text
+				if name == "" {
+					name, fg = locales.CmdPreviewPlaceholder(), lk.textFaint
+				}
+				ui.Text(c, name).FontSize(12.5).TextColor(fg).Grow(1).SingleLine().Ellipsis("…")
+				if w.cmdAutoSubmit {
+					ui.Text(c, "⏎").FontSize(11).TextColor(lk.textMuted).Padding(1, 5).Radius(4).Background(lk.card)
+				}
+			})
+
 			ui.Form(c, func() {
 				ui.Field(c, locales.FieldName(), func() { ui.TextInput(c, &w.cmdName) })
-				ui.Field(c, locales.FieldCmdText(), func() { ui.TextArea(c, &w.cmdText).Lines(3, 6) })
+				ui.Field(c, locales.FieldCmdText(), func() { ui.TextArea(c, &w.cmdText).Lines(4, 8) })
 				ui.Field(c, locales.FieldCmdIcon(), func() {
-					ui.Combobox(c, &w.cmdIcon, w.cmdIcons)
+					ui.Row(c).Gap(4).Wrap().Children(func() {
+						for _, name := range w.cmdIcons {
+							name := name
+							selected := name == w.cmdIcon
+							b := ui.ButtonBase(c).Size(30, 30).Radius(6).Center().
+								Label(iconTitle(name)).Border(1, ui.Transparent)
+							if selected {
+								b.Background(lk.accentSoft)
+								b.BorderColor(lk.accent)
+							} else if b.Hovered() {
+								b.Background(lk.rowHover)
+							}
+							b.Children(func() {
+								fg := lk.textMuted
+								if selected {
+									fg = lk.accent
+								}
+								ui.Icon(c, cmdIcon(name)).Size(15, 15).TextColor(fg)
+							})
+							b.Tooltip(iconTitle(name))
+							if b.Clicked() {
+								w.cmdIcon = name
+							}
+						}
+					})
 				})
-				ui.Field(c, locales.CmdAutoSubmit(), func() {
-					ui.Checkbox(c, &w.cmdAutoSubmit, locales.CmdAutoSubmit())
+				ui.Field(c, locales.FieldAfterSend(), func() {
+					ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+						ui.Switch(c, &w.cmdAutoSubmit)
+						ui.Text(c, locales.CmdAutoSubmit()).FontSize(12).TextColor(lk.textMuted).SingleLine()
+					})
 				})
 			})
+
+			ui.Text(c, locales.CmdHint()).FontSize(11.5).TextColor(lk.textFaint).SingleLine()
 			if w.cmdName == "" || w.cmdText == "" {
-				ui.Text(c, locales.CmdRequired()).TextColor(c.Theme().TextMuted)
+				ui.Text(c, locales.CmdRequired()).FontSize(12.5).TextColor(lk.danger)
 			}
+
 			ui.Row(c).Gap(8).Children(func() {
 				ui.Spacer(c)
 				if ui.Button(c, locales.BtnCancel()).Clicked() {
@@ -75,4 +127,12 @@ func (w *Window) cmdDialog(c *ui.Context) {
 			})
 		})
 	})
+}
+
+// iconTitle names a command icon for its tooltip.
+func iconTitle(name string) string {
+	if name == "" {
+		return ""
+	}
+	return strings.ToUpper(name[:1]) + name[1:]
 }

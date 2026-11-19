@@ -19,46 +19,55 @@ func (w *Window) openThemeDialog() {
 }
 
 func (w *Window) themeDialog(c *ui.Context) {
+	lk := lookFor(c)
 	ui.Modal(c, &w.themeOpen, func() {
-		ui.Column(c).Width(460).Height(520).Padding(16).Gap(12).Children(func() {
-			ui.Text(c, locales.ThemeTitle())
+		ui.Column(c).Width(460).Height(520).Padding(20).Gap(14).Children(func() {
+			dialogHeading(c, locales.ThemeTitle())
 			ui.SearchField(c, &w.themeQuery).Label(locales.ThemeSearch())
 
 			ui.Scroll(c).Fill().Grow(1).Children(func() {
-				ui.Column(c).FillWidth().Gap(2).Children(func() {
+				ui.Column(c).FillWidth().Gap(1).Children(func() {
 					shown := w.filteredThemeNames()
 					if len(shown) == 0 {
-						ui.Text(c, locales.ThemeNone()).TextColor(c.Theme().TextMuted)
+						ui.Text(c, locales.ThemeNone()).FontSize(12.5).TextColor(lk.textMuted).Padding(8, 10)
+					}
+					// the default comes first, then Ghostty's themes that match
+					if w.themeQuery == "" {
+						w.themeRow(c, lk, "", locales.ThemeDefault())
 					}
 					for _, name := range shown {
-						name := name
-						if ui.Button(c, "").Children(func() {
-							ui.Row(c).FillWidth().Gap(6).Children(func() {
-								ui.Text(c, name).Grow(1).SingleLine()
-								if w.termThemeName == name {
-									ui.Icon(c, iconCheck)
-								}
-							})
-						}).Clicked() {
-							w.applyTermTheme(name)
-							w.themeOpen = false
-						}
+						w.themeRow(c, lk, name, name)
 					}
 				})
 			})
 
 			ui.Row(c).Gap(8).Children(func() {
 				ui.Spacer(c)
-				if ui.Button(c, locales.ThemeDefault()).Clicked() {
-					w.applyTermTheme("")
-					w.themeOpen = false
-				}
 				if ui.Button(c, locales.BtnCancel()).Clicked() {
 					w.themeOpen = false
 				}
 			})
 		})
 	})
+}
+
+// themeRow is one choice of the theme dialog: a quiet row that marks the
+// theme in use and takes a click.
+func (w *Window) themeRow(c *ui.Context, lk *look, name, label string) {
+	b := ui.ButtonBase(c).FillWidth().Height(30).Padding(0, 8).Radius(6).Label(label)
+	if b.Hovered() {
+		b.Background(lk.rowHover)
+	}
+	b.Children(func() {
+		ui.Text(c, label).FontSize(13).TextColor(lk.text).Grow(1).SingleLine().Ellipsis("…")
+		if w.termThemeName == name {
+			ui.Icon(c, iconCheck).Size(14, 14).TextColor(lk.accent)
+		}
+	})
+	if b.Clicked() {
+		w.applyTermTheme(name)
+		w.themeOpen = false
+	}
 }
 
 // filteredThemeNames narrows the theme names to what the search field asks
@@ -97,7 +106,12 @@ func (w *Window) applyTermTheme(name string) {
 	}
 	w.termTheme = t
 	for _, tab := range w.tabs {
-		tab.term.UseTheme(t)
+		if t != nil {
+			tab.term.SetTheme(t, nil)
+		} else {
+			// back to the card's colors, in each appearance
+			tab.term.SetTheme(termLight, termDark)
+		}
 	}
 	w.save()
 }

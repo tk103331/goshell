@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/plugins/terminal"
@@ -12,7 +13,9 @@ import (
 	"goshell/locales"
 )
 
-// Config is a kind of session the sidebar keeps: SSH, Docker or K8S.
+// Config is a host the sidebar keeps: an SSH server, a Docker daemon or a
+// Kubernetes cluster. Opening one starts a terminal session in a tab; Docker
+// and Kubernetes ask which container first.
 type Config interface {
 	Name() string
 	Type() string
@@ -37,7 +40,14 @@ type Config interface {
 func (w *Window) openCreate() {
 	w.pendingSSH = &SSHConfig{data: &SSHConfigData{Port: 22}, port: "22"}
 	w.pendingDock = &DockerConfig{data: &DockerConfigData{}}
-	w.pendingK8S = &K8SConfig{data: &K8SConfigData{}}
+	kubeconfig := defaultKubeconfig()
+	w.pendingK8S = &K8SConfig{data: &K8SConfigData{
+		Source:     "kubeconfig",
+		Kubeconfig: kubeconfig,
+	}, kube: kubeconfig != ""}
+	if kubeconfig == "" {
+		w.pendingK8S.data.Source = "token"
+	}
 	w.confEditing = nil
 	w.confKind = "SSH"
 	w.confTitle = locales.CreateConfig()
@@ -61,18 +71,20 @@ func (w *Window) removeConfig(index int) {
 }
 
 func (w *Window) configDialog(c *ui.Context) {
+	lk := lookFor(c)
 	ui.Modal(c, &w.confOpen, func() {
-		ui.Column(c).Width(460).Padding(16).Gap(12).Children(func() {
-			ui.Text(c, w.confTitle)
+		ui.Column(c).Width(560).Padding(20).Gap(14).Children(func() {
+			dialogHeading(c, w.confTitle)
 
 			var err string
 			if w.confEditing != nil {
+				w.hostKindBadge(c, lk, w.confEditing.Type())
 				w.confEditing.Fields(c, true, w)
 				err = w.confEditing.Validate()
 			} else {
-				ui.Field(c, locales.FieldType(), func() {
-					ui.Select(c, &w.confKind, []string{"SSH", "Docker", "K8S"})
-				})
+				ui.Text(c, locales.HostKindHint()).FontSize(12).TextColor(lk.textMuted)
+				w.hostKindCards(c, lk)
+				ui.Box(c).FillWidth().Height(1).Background(lk.divider).Margin(0, 2, 0, 2)
 				switch w.confKind {
 				case "SSH":
 					w.pendingSSH.Fields(c, false, w)
@@ -87,13 +99,12 @@ func (w *Window) configDialog(c *ui.Context) {
 			}
 
 			if err != "" {
-				ui.Text(c, err).TextColor(c.Theme().Danger)
+				ui.Text(c, err).FontSize(12.5).TextColor(lk.danger)
 			}
 
 			ui.Row(c).Gap(8).Children(func() {
 				ui.Spacer(c)
-				cancel := ui.Button(c, locales.BtnCancel())
-				if cancel.Clicked() {
+				if ui.Button(c, locales.BtnCancel()).Clicked() {
 					w.confOpen = false
 				}
 				ok := ui.PrimaryButton(c, locales.BtnOK())
@@ -106,6 +117,70 @@ func (w *Window) configDialog(c *ui.Context) {
 			})
 		})
 	})
+}
+
+// hostKindCards are the three ways to add a host, as cards.
+func (w *Window) hostKindCards(c *ui.Context, lk *look) {
+	ui.Row(c).FillWidth().Gap(8).Children(func() {
+		for _, kind := range []string{"SSH", "Docker", "K8S"} {
+			kind := kind
+			selected := w.confKind == kind
+			card := ui.Column(c).Grow(1).Basis(0).Height(78).Padding(10, 10).Gap(4).
+				Radius(10).Border(1, lk.cardBorder).Cursor(ui.CursorPointer)
+			switch {
+			case selected:
+				card.Background(lk.accentSoft)
+				card.Border(1, lk.accent)
+			case card.Hovered():
+				card.Background(lk.rowHover)
+			}
+			card.Children(func() {
+				ui.Row(c).FillWidth().Gap(6).AlignItems(ui.Center).Children(func() {
+					fg, bg := typeTint(kindType(kind), lk)
+					ui.Box(c).Size(22, 22).Radius(6).Center().Background(bg).Children(func() {
+						ui.Icon(c, typeIcon(kindType(kind))).Size(12, 12).TextColor(fg)
+					})
+					ui.Text(c, kindLabel(kindType(kind))).FontSize(12.5).FontWeight(600).
+						TextColor(lk.text).Grow(1).SingleLine()
+					if selected {
+						ui.Icon(c, iconCheck).Size(12, 12).TextColor(lk.accent)
+					}
+				})
+				ui.Text(c, kindDescription(kind)).FontSize(10.5).TextColor(lk.textMuted).LineHeight(1.3)
+			})
+			if card.Clicked() {
+				w.confKind = kind
+			}
+		}
+	})
+}
+
+// hostKindBadge is the type of a host being edited.
+func (w *Window) hostKindBadge(c *ui.Context, lk *look, kind string) {
+	fg, bg := typeTint(kindType(kind), lk)
+	ui.Row(c).FillWidth().Height(38).Padding(0, 10).Gap(8).Radius(8).
+		Background(lk.chip).AlignItems(ui.Center).Children(func() {
+		ui.Box(c).Size(22, 22).Radius(6).Center().Background(bg).Children(func() {
+			ui.Icon(c, typeIcon(kindType(kind))).Size(12, 12).TextColor(fg)
+		})
+		ui.Text(c, kindLabel(kindType(kind))).FontSize(12.5).FontWeight(600).TextColor(lk.text)
+	})
+}
+
+func kindType(kind string) string {
+	return strings.ToLower(kind)
+}
+
+func kindDescription(kind string) string {
+	switch kind {
+	case "SSH":
+		return locales.HostKindSSH()
+	case "Docker":
+		return locales.HostKindDocker()
+	case "K8S":
+		return locales.HostKindK8S()
+	}
+	return ""
 }
 
 func (w *Window) confOk() {
@@ -139,6 +214,10 @@ type appFile struct {
 	Appearance    string            `json:"appearance,omitempty"`
 	TerminalTheme string            `json:"terminalTheme,omitempty"`
 	SidebarHidden bool              `json:"sidebarHidden,omitempty"`
+	FilesHidden   bool              `json:"filesHidden,omitempty"`
+	FilesWidth    float32           `json:"filesWidth,omitempty"`
+	FollowDir     *bool             `json:"followDir,omitempty"`
+	DockerDefault bool              `json:"dockerDefault,omitempty"`
 }
 
 func (w *Window) load() error {
@@ -188,6 +267,14 @@ func (w *Window) load() error {
 	w.appTheme = f.Appearance
 	w.termThemeName = f.TerminalTheme
 	w.showSidebar = !f.SidebarHidden
+	w.showFiles = !f.FilesHidden
+	if f.FilesWidth > 0 {
+		w.filesWidth = min(max(f.FilesWidth, 200), 560)
+	}
+	if f.FollowDir != nil {
+		w.followDir = *f.FollowDir
+	}
+	w.dockerDefaultAdded = f.DockerDefault
 	if name := f.TerminalTheme; name != "" {
 		if t, err := terminal.GhosttyTheme(name); err == nil {
 			w.termTheme = t
@@ -207,6 +294,7 @@ func (w *Window) save() {
 		Appearance:    w.appTheme,
 		TerminalTheme: w.termThemeName,
 		SidebarHidden: !w.showSidebar,
+		DockerDefault: w.dockerDefaultAdded,
 	}
 	for _, conf := range w.confs {
 		data, err := json.Marshal(conf.Data())

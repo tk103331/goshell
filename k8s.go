@@ -2,11 +2,18 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"log"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/plugins/terminal"
 	"github.com/egoist/mygo/ui"
 	"github.com/tk103331/stream"
@@ -16,6 +23,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/remotecommand"
 )
 
@@ -25,6 +33,9 @@ type K8SConfigData struct {
 	Server      string `json:"server,omitempty"`
 	Token       string `json:"token,omitempty"`       // 加密存储
 	InsecureTLS bool   `json:"insecureTLS,omitempty"` // 是否跳过TLS验证（默认false）
+	Source      string `json:"source,omitempty"`      // "kubeconfig" or "token"
+	Kubeconfig  string `json:"kubeconfig,omitempty"`
+	Context     string `json:"context,omitempty"`
 }
 
 // getToken 返回解密后的 token
@@ -46,6 +57,7 @@ type K8SConfig struct {
 	data *K8SConfigData
 
 	tokenPlain string // the token as the form edits it, encrypted on save
+	kube       bool   // the form's connection kind
 }
 
 func (c *K8SConfig) Name() string      { return c.data.Name }
@@ -54,6 +66,11 @@ func (c *K8SConfig) Data() interface{} { return c.data }
 
 func (c *K8SConfig) Apply() {
 	c.data.Type = c.Type()
+	if c.kube {
+		c.data.Source = "kubeconfig"
+	} else {
+		c.data.Source = "token"
+	}
 	// a token typed in this session is encrypted; a blank one leaves the
 	// stored token alone, as when editing without retyping it
 	if c.tokenPlain != "" || c.data.Token == "" {
@@ -67,11 +84,22 @@ func (c *K8SConfig) Apply() {
 func (c *K8SConfig) Prefill() {
 	// tokens stay hidden when editing: retype to change one
 	c.tokenPlain = ""
+	c.kube = c.data.Source == "kubeconfig" ||
+		(c.data.Source == "" && c.data.Kubeconfig != "")
 }
 
 func (c *K8SConfig) Validate() string {
 	if c.data.Name == "" {
 		return locales.ValNameRequired()
+	}
+	if c.kube {
+		if strings.TrimSpace(c.data.Kubeconfig) == "" {
+			return locales.ValKubeconfigRequired()
+		}
+		if _, err := os.Stat(expandKubeconfigPath(c.data.Kubeconfig)); err != nil {
+			return locales.ValKubeconfigNotFound(c.data.Kubeconfig)
+		}
+		return ""
 	}
 	if c.data.Server == "" {
 		return locales.ValServerRequired()
@@ -89,6 +117,35 @@ func (c *K8SConfig) Fields(ctx *ui.Context, editing bool, w *Window) {
 			e.ReadOnly(true)
 		}
 	})
+	ui.Field(ctx, locales.FieldK8sSource(), func() {
+		ui.RadioGroup(ctx, func() {
+			ui.Radio(ctx, &c.kube, true, locales.K8sSourceKubeconfig())
+			ui.Radio(ctx, &c.kube, false, locales.K8sSourceToken())
+		})
+	})
+	if c.kube {
+		ui.Field(ctx, locales.FieldKubeconfig(), func() {
+			ui.Row(ctx).FillWidth().Gap(6).Children(func() {
+				ui.TextInput(ctx, &c.data.Kubeconfig).Grow(1).Placeholder("~/.kube/config")
+				if ui.Button(ctx, locales.BtnChooseKubeconfig()).Clicked() {
+					go func() {
+						paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{
+							Title:       locales.ChooseKubeconfigTitle(),
+							ButtonLabel: locales.BtnUseKubeconfig(),
+						})
+						if err != nil || len(paths) == 0 {
+							return
+						}
+						w.onMain(func() { c.data.Kubeconfig = paths[0] })
+					}()
+				}
+			})
+		})
+		ui.Field(ctx, locales.FieldKubeContext(), func() {
+			ui.TextInput(ctx, &c.data.Context).Placeholder(locales.KubeContextPlaceholder())
+		})
+		return
+	}
 	ui.Field(ctx, locales.FieldServer(), func() { ui.TextInput(ctx, &c.data.Server) })
 	ui.Field(ctx, locales.FieldToken(), func() {
 		e := ui.TextArea(ctx, &c.tokenPlain).Lines(3, 6)
@@ -101,29 +158,88 @@ func (c *K8SConfig) Fields(ctx *ui.Context, editing bool, w *Window) {
 	})
 }
 
-func (c *K8SConfig) clientset() (*kubernetes.Clientset, error) {
-	// 获取解密后的 token
+// useKubeconfig says whether the saved config reads a kubeconfig, which
+// survives the form's own state.
+func (c *K8SConfig) useKubeconfig() bool {
+	return c.data.Source == "kubeconfig" ||
+		(c.data.Source == "" && c.data.Kubeconfig != "")
+}
+
+// restConfig builds the client configuration from a kubeconfig or the saved
+// server and token.
+func (c *K8SConfig) restConfig() (*rest.Config, error) {
+	if c.useKubeconfig() {
+		path := expandKubeconfigPath(c.data.Kubeconfig)
+		if path == "" {
+			return nil, errors.New("k8s: kubeconfig is required")
+		}
+		rules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: path}
+		overrides := &clientcmd.ConfigOverrides{}
+		if c.data.Context != "" {
+			overrides.CurrentContext = c.data.Context
+		}
+		return clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides).ClientConfig()
+	}
 	token, err := secretOf(c.data.Token)
 	if err != nil {
 		return nil, err
 	}
-	restCfg := &rest.Config{
+	return &rest.Config{
 		Host:        c.data.Server,
 		BearerToken: token,
 		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: c.data.InsecureTLS, // 使用配置的设置，默认 false
+			Insecure: c.data.InsecureTLS,
 		},
+	}, nil
+}
+
+func (c *K8SConfig) clientset() (*kubernetes.Clientset, *rest.Config, error) {
+	restCfg, err := c.restConfig()
+	if err != nil {
+		return nil, nil, err
 	}
-	return kubernetes.NewForConfig(restCfg)
+	cli, err := kubernetes.NewForConfig(restCfg)
+	return cli, restCfg, err
+}
+
+// expandKubeconfigPath expands ~ at the start of a path, as the file picker
+// and a typed path may hold it.
+func expandKubeconfigPath(path string) string {
+	if path == "~" || strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return path
+		}
+		return filepath.Join(home, strings.TrimPrefix(path, "~/"))
+	}
+	return path
+}
+
+// defaultKubeconfig is the user's kubeconfig, when one exists.
+func defaultKubeconfig() string {
+	path := os.Getenv("KUBECONFIG")
+	if path != "" {
+		path, _, _ = strings.Cut(path, string(os.PathListSeparator))
+	} else {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return ""
+		}
+		path = filepath.Join(home, ".kube", "config")
+	}
+	if _, err := os.Stat(path); err != nil {
+		return ""
+	}
+	return path
 }
 
 func (c *K8SConfig) Term(w *Window) {
-	cli, err := c.clientset()
+	cli, restCfg, err := c.clientset()
 	if err != nil {
 		w.showError(err)
 		return
 	}
-	st := &k8sDialog{win: w, cfg: c, cli: cli}
+	st := &k8sDialog{win: w, cfg: c, cli: cli, rest: restCfg, open: true}
 	w.k8s = st
 	go st.loadNamespaces()
 }
@@ -134,98 +250,159 @@ type k8sDialog struct {
 	open bool
 	cfg  *K8SConfig
 	cli  *kubernetes.Clientset
+	rest *rest.Config
 
 	namespaces []string
 	pods       []string
 	containers []string
 
-	ns, pod, ct string
-	err         error
-	loadingPods bool
-	loadingCTs  bool
+	ns, pod, ct       string
+	err               error
+	loadingNamespaces bool
+	loadingPods       bool
+	loadingCTs        bool
 }
 
 func (st *k8sDialog) loadNamespaces() {
+	st.win.onMain(func() { st.loadingNamespaces, st.err = true, nil })
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	list, err := st.cli.CoreV1().Namespaces().List(ctx, metav1.ListOptions{})
 	st.win.onMain(func() {
-		st.err = err
-		if err == nil {
-			s, _ := stream.New(list.Items)
-			s.Map(func(n corev1.Namespace) string {
-				return n.ObjectMeta.Name
-			}).ToSlice(&st.namespaces)
+		st.loadingNamespaces, st.err = false, err
+		if err != nil {
+			return
+		}
+		s, _ := stream.New(list.Items)
+		s.Map(func(n corev1.Namespace) string {
+			return n.ObjectMeta.Name
+		}).ToSlice(&st.namespaces)
+		sort.Strings(st.namespaces)
+		if st.ns == "" {
+			for _, ns := range st.namespaces {
+				if ns == "default" {
+					st.ns = ns
+					break
+				}
+			}
+			if st.ns == "" && len(st.namespaces) > 0 {
+				st.ns = st.namespaces[0]
+			}
+		}
+		if st.ns != "" {
+			go st.loadPods()
 		}
 	})
 }
 
 func (st *k8sDialog) loadPods() {
-	st.win.onMain(func() { st.loadingPods = true })
+	st.win.onMain(func() {
+		st.loadingPods, st.err = true, nil
+		st.pods, st.pod, st.containers, st.ct = nil, "", nil, ""
+	})
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	list, err := st.cli.CoreV1().Pods(st.ns).List(ctx, metav1.ListOptions{})
 	st.win.onMain(func() {
-		st.err, st.loadingPods = err, false
-		if err == nil {
-			s, _ := stream.New(list.Items)
-			s.Map(func(n corev1.Pod) string {
-				return n.ObjectMeta.Name
-			}).Limit(20).ToSlice(&st.pods)
+		st.loadingPods, st.err = false, err
+		if err != nil {
+			return
+		}
+		s, _ := stream.New(list.Items)
+		s.Map(func(n corev1.Pod) string {
+			return n.ObjectMeta.Name
+		}).ToSlice(&st.pods)
+		sort.Strings(st.pods)
+		if len(st.pods) > 0 {
+			st.pod = st.pods[0]
+			go st.loadContainers()
 		}
 	})
 }
 
 func (st *k8sDialog) loadContainers() {
-	st.win.onMain(func() { st.loadingCTs = true })
+	st.win.onMain(func() {
+		st.loadingCTs, st.err = true, nil
+		st.containers, st.ct = nil, ""
+	})
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	pod, err := st.cli.CoreV1().Pods(st.ns).Get(ctx, st.pod, metav1.GetOptions{})
 	st.win.onMain(func() {
-		st.err, st.loadingCTs = err, false
-		if err == nil {
-			s, _ := stream.New(pod.Spec.Containers)
-			s.Map(func(n corev1.Container) string {
-				return n.Name
-			}).Limit(20).ToSlice(&st.containers)
+		st.loadingCTs, st.err = false, err
+		if err != nil {
+			return
+		}
+		s, _ := stream.New(pod.Spec.Containers)
+		s.Map(func(n corev1.Container) string {
+			return n.Name
+		}).ToSlice(&st.containers)
+		sort.Strings(st.containers)
+		if len(st.containers) > 0 {
+			st.ct = st.containers[0]
 		}
 	})
 }
 
+func (st *k8sDialog) refresh() {
+	go st.loadNamespaces()
+}
 func (st *k8sDialog) dialog(c *ui.Context) {
+	lk := lookFor(c)
 	ui.Modal(c, &st.open, func() {
-		ui.Column(c).Width(460).Padding(16).Gap(12).Children(func() {
-			ui.Text(c, locales.DockerTitle())
-			if st.err != nil {
-				ui.Text(c, st.err.Error()).TextColor(c.Theme().Danger)
+		ui.Column(c).Width(520).Padding(20).Gap(12).Children(func() {
+			dialogHeading(c, locales.K8sTitle())
+			detail := st.cfg.data.Server
+			if st.cfg.useKubeconfig() {
+				detail = st.cfg.data.Kubeconfig
+				if st.cfg.data.Context != "" {
+					detail += " · " + st.cfg.data.Context
+				}
 			}
+			if detail != "" {
+				ui.Text(c, detail).FontSize(11.5).TextColor(lk.textFaint).SingleLine().Ellipsis("…")
+			}
+
 			ui.Form(c, func() {
 				ui.Field(c, locales.FieldNamespace(), func() {
-					if ui.Select(c, &st.ns, st.namespaces).Changed() {
-						st.pods, st.pod, st.containers, st.ct = nil, "", nil, ""
-						go st.loadPods()
+					if ui.Combobox(c, &st.ns, st.namespaces).Disabled(st.loadingNamespaces).Changed() {
+						if st.ns != "" {
+							go st.loadPods()
+						}
 					}
 				})
 				ui.Field(c, locales.FieldPod(), func() {
-					if ui.Select(c, &st.pod, st.pods).Changed() {
-						st.containers, st.ct = nil, ""
-						go st.loadContainers()
+					if ui.Combobox(c, &st.pod, st.pods).Disabled(st.ns == "" || st.loadingPods).Changed() {
+						if st.pod != "" {
+							go st.loadContainers()
+						}
 					}
 				})
 				ui.Field(c, locales.FieldContainer(), func() {
-					ui.Select(c, &st.ct, st.containers)
+					ui.Combobox(c, &st.ct, st.containers).Disabled(st.pod == "" || st.loadingCTs)
 				})
 			})
-			switch {
-			case st.loadingPods || st.loadingCTs:
-				ui.Row(c).Gap(8).Children(func() {
-					ui.Spinner(c)
-					ui.Text(c, locales.K8sLoading())
+
+			if st.err != nil {
+				ui.Row(c).FillWidth().AlignItems(ui.Center).Gap(8).Children(func() {
+					ui.Text(c, st.err.Error()).FontSize(12).TextColor(lk.danger).Grow(1).LineHeight(1.35)
+					if ui.Button(c, locales.BtnRetry()).Clicked() {
+						st.refresh()
+					}
 				})
-			case st.ns == "" || st.pod == "" || st.ct == "":
-				ui.Text(c, locales.K8sHint()).TextColor(c.Theme().TextMuted)
+			} else if st.loadingNamespaces || st.loadingPods || st.loadingCTs {
+				ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+					ui.Spinner(c).Size(13, 13)
+					ui.Text(c, locales.K8sLoading()).FontSize(12).TextColor(lk.textMuted)
+				})
+			} else if st.ns == "" || st.pod == "" || st.ct == "" {
+				ui.Text(c, locales.K8sHint()).FontSize(12.5).TextColor(lk.textMuted)
 			}
-			ui.Row(c).Gap(8).Children(func() {
+
+			ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+				if ui.Button(c, locales.BtnRefresh()).Clicked() {
+					st.refresh()
+				}
 				ui.Spacer(c)
 				if ui.Button(c, locales.BtnCancel()).Clicked() {
 					st.open = false
@@ -241,25 +418,19 @@ func (st *k8sDialog) dialog(c *ui.Context) {
 		})
 	})
 }
-
 func (st *k8sDialog) connect() {
 	w := st.win
 	if st.ns == "" || st.pod == "" || st.ct == "" {
 		return
 	}
-	// 获取解密后的 token
-	token, err := secretOf(st.cfg.data.Token)
-	if err != nil {
-		w.showError(err)
+	restCfg := st.rest
+	if restCfg == nil {
+		w.showError(errors.New("k8s: no REST configuration"))
 		return
 	}
-	restCfg := &rest.Config{
-		Host:        st.cfg.data.Server,
-		BearerToken: token,
-		TLSClientConfig: rest.TLSClientConfig{
-			Insecure: st.cfg.data.InsecureTLS, // 使用配置的设置，默认 false
-		},
-	}
+	// the marker lets the file sidebar find this shell's /proc entry
+	token := fmt.Sprintf("goshell-%d", time.Now().UnixNano())
+	command := "export GOSHELL_SESSION=" + token + "; exec /bin/sh"
 	req := st.cli.CoreV1().RESTClient().Post().
 		Resource("pods").
 		Name(st.pod).
@@ -267,7 +438,7 @@ func (st *k8sDialog) connect() {
 		SubResource("exec").
 		VersionedParams(&corev1.PodExecOptions{
 			Container: st.ct,
-			Command:   []string{"bash"},
+			Command:   []string{"/bin/sh", "-c", command},
 			Stdin:     true,
 			Stdout:    true,
 			Stderr:    true,
@@ -289,6 +460,7 @@ func (st *k8sDialog) connect() {
 		conn.Close()
 		return
 	}
+	tab.useFiles(&k8sFiles{cli: st.cli, cfg: restCfg, ns: st.ns, pod: st.pod, ct: st.ct, marker: token})
 
 	go func() {
 		err := executor.Stream(remotecommand.StreamOptions{

@@ -12,6 +12,7 @@
 *.out
 .idea
 cmd/goshell/goshell
+/goshell
 
 # MyGo build output (mygo build writes here, see mygo.json)
 dist/

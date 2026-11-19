@@ -12,6 +12,7 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/plugins/terminal"
 	"github.com/egoist/mygo/ui"
+	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
 	"goshell/locales"
@@ -225,7 +226,7 @@ func (c *SSHConfig) Term(w *Window) {
 		return
 	}
 	modes := ssh.TerminalModes{
-		ssh.ECHO:          0,     // disable echoing
+		ssh.ECHO:          1,     // let the server echo what is typed
 		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
 		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
 	}
@@ -261,6 +262,11 @@ func (c *SSHConfig) Term(w *Window) {
 		session.Close()
 		conn.Close()
 		return
+	}
+	if files, err := sftp.NewClient(conn); err == nil {
+		tab.useFiles(&sftpFiles{cli: files, conn: conn})
+	} else {
+		log.Println("sftp:", err)
 	}
 
 	go func() {
@@ -306,5 +312,6 @@ func (c *sshConn) Write(p []byte) (int, error) { return c.in.Write(p) }
 func (c *sshConn) Close() error                { return c.session.Close() }
 
 func (c *sshConn) Resize(cols, rows int) error {
-	return c.session.WindowChange(cols, rows)
+	// WindowChange takes the height first, then the width.
+	return c.session.WindowChange(rows, cols)
 }
