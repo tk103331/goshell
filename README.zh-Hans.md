@@ -28,6 +28,7 @@ Docker 和 Kubernetes 主机，在主机下打开终端会话，并把这些主�
 - 首次启动时检测本地 Docker daemon，并自动添加配置。
 - 支持 Program Status Protocol（OSC 7501）：会话行图标显示程序状态，
   悬停可查看消息。
+- 标题栏支持查找；检测到新版本时，标题栏显示下载提醒。
 - 支持从 GitHub Release 签名自动更新，并提供 Help > Check for Updates…
 
 # 截图
@@ -46,6 +47,9 @@ Docker 和 Kubernetes 主机，在主机下打开终端会话，并把这些主�
 
 ### 程序状态
 ![GoShell 程序状态](screenshot/program-status.png)
+
+### 查找
+![GoShell 查找](screenshot/find.png)
 
 ### 文件边栏
 ![GoShell 文件边栏](screenshot/files.png)
@@ -135,8 +139,8 @@ rsync -a ~/Photos backup:/photos && status done "Photos synced" || status error 
 # 外观与语言
 
 主机侧栏底部有月亮 / 太阳按钮用于切换浅色和深色主题，`中文`/`EN` 按钮用于
-切换语言，以及关于按钮。标题栏包含查找和文件边栏按钮；新建快捷命令位于
-File 菜单中。View 菜单提供相同的主题、语言和终端主题选项，
+切换语言，以及关于按钮。标题栏包含查找、文件边栏按钮，以及可用更新提醒；
+新建快捷命令位于 File 菜单中。View 菜单提供相同的主题、语言和终端主题选项，
 “System” 表示跟随系统外观和语言。
 
 View > Terminal Theme… 可以选择 Ghostty 内置的终端主题，或恢复为卡片默认配色。
@@ -152,7 +156,8 @@ View > Terminal Theme… 可以选择 Ghostty 内置的终端主题，或恢复�
 
 打包后的应用会在后台检查 [GitHub 最新 Release](https://github.com/tk103331/goshell/releases)，
 也可以从 Help > Check for Updates… 立即检查。原生更新窗口会显示版本和更新说明，
-下载并校验签名后安装，并询问是否重启进入新版本。
+下载并校验签名后安装，并询问是否重启进入新版本。Help > About 显示当前版本；
+检查到新版本时，标题栏也会显示下载提醒。
 
 更新文件使用 Ed25519 私钥签名，公钥保存在 `mygo.json` 的 `updates.publicKey`。
 `mygo build` 从 `MYGO_UPDATER_PRIVATE_KEY` 读取私钥；发布工作流从同名

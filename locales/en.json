@@ -164,5 +164,8 @@
   "toastConnected": "Connected to {target}",
   "toastSessionEnded": "Session ended: {name}",
   "alertError": "Error",
-  "aboutBody": "GoShell is a simple terminal GUI client, written in Go, via MyGo. Supports SSH, Docker and K8S."
+  "aboutBody": "GoShell is a simple terminal GUI client, written in Go, via MyGo. Supports SSH, Docker and K8S.",
+  "aboutVersion": "Version {version}",
+  "aboutUpdateCheck": "Check for Updates…",
+  "updateAvailable": "Version {version} is available"
 }

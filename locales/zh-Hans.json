@@ -158,5 +158,8 @@
   "toastConnected": "已连接到 {target}",
   "toastSessionEnded": "会话已结束：{name}",
   "alertError": "错误",
-  "aboutBody": "GoShell 是一个用 Go 编写、基于 MyGo 的简易终端图形客户端，支持 SSH、Docker 和 K8S。"
+  "aboutBody": "GoShell 是一个用 Go 编写、基于 MyGo 的简易终端图形客户端，支持 SSH、Docker 和 K8S。",
+  "aboutVersion": "版本 {version}",
+  "aboutUpdateCheck": "检查更新…",
+  "updateAvailable": "新版本 {version} 可用"
 }

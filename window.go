@@ -11,6 +11,7 @@ import (
 	"github.com/egoist/mygo"
 	"github.com/egoist/mygo/i18n"
 	"github.com/egoist/mygo/plugins/terminal"
+	"github.com/egoist/mygo/plugins/updater"
 	"github.com/egoist/mygo/ui"
 	"goshell/locales"
 )
@@ -30,7 +31,8 @@ type Window struct {
 	tabs     []*Tab
 	selected int
 
-	sidebar     float32 // the width of the sidebar, as a percent of the split
+	sidebar     float32 // the width of the sidebar, in DIPs
+	sidebarDrag float32 // the width as a drag of its edge began, 0 while none
 	showSidebar bool    // the sidebar of sessions shows
 	lastTitle   string  // the window title last shown
 
@@ -102,7 +104,7 @@ type Window struct {
 func newWindow() *Window {
 	w := &Window{
 		ready:           make(chan struct{}),
-		sidebar:         22,
+		sidebar:         264,
 		showSidebar:     true,
 		showFiles:       true,
 		filesWidth:      280,
@@ -169,13 +171,17 @@ func (w *Window) view(c *ui.Context) {
 
 	ui.Column(c).Fill().Background(lk.wash).Children(func() {
 		w.titleBar(c)
-		if w.showSidebar {
-			ui.SplitPercent(c, &w.sidebar,
-				func() { w.sidebarView(c) },
-				func() { w.contentView(c) }).Fill().Grow(1)
-		} else {
-			w.contentView(c)
-		}
+		ui.Row(c).Fill().MinHeight(0).AlignItems(ui.Stretch).Children(func() {
+			if w.showSidebar {
+				ui.Column(c).FillHeight().Width(w.sidebar).Shrink(0).Children(func() {
+					w.sidebarView(c)
+				})
+				w.sidebarHandle(c)
+			}
+			ui.Column(c).FillHeight().Grow(1).Basis(0).MinWidth(0).Children(func() {
+				w.contentView(c)
+			})
+		})
 	})
 
 	w.dialogs(c)
@@ -220,7 +226,27 @@ func (w *Window) titleBar(c *ui.Context) {
 			})
 		})
 
-		w.barButton(c, iconSearch, locales.MenuFind(), w.toggleFind)
+		if v := availableUpdate(); v != "" {
+			b := ui.ButtonBase(c).Height(24).Padding(0, 8).Radius(6).Gap(4).
+				Background(lk.accentSoft).Label(locales.UpdateAvailable(v))
+			b.Children(func() {
+				ui.Icon(c, iconDownload).Size(12, 12).TextColor(lk.accent)
+				ui.Textf(c, "v%s", v).FontSize(11.5).TextColor(lk.accent)
+			})
+			b.Tooltip(locales.UpdateAvailable(v))
+			if b.Clicked() {
+				updater.CheckForUpdates()
+			}
+		}
+		tab := w.selectedTab()
+		if tab != nil {
+			w.findBar(c, lk, tab)
+		} else if w.findOpen || w.findTab != nil {
+			w.stopFind()
+		}
+		if tab == nil || !w.findOpen {
+			w.barButton(c, iconSearch, locales.MenuFind(), w.toggleFind)
+		}
 		w.barButton(c, iconPanelRight, locales.TooltipToggleFiles(), w.toggleFiles)
 
 		if !mac {
@@ -418,12 +444,34 @@ func (w *Window) plusButton(c *ui.Context, tip string, fn func()) {
 	}
 }
 
+// sidebarHandle is the edge between the host list and the terminal, which
+// a drag moves; it draws no line.
+func (w *Window) sidebarHandle(c *ui.Context) {
+	h := ui.Box(c.Key("sidebar-resize")).Width(5).FillHeight().Cursor(ui.CursorResizeColumn)
+	if dx, _, ok := h.Dragged(); ok {
+		if w.sidebarDrag == 0 {
+			w.sidebarDrag = w.sidebar
+		}
+		w.sidebar = min(max(w.sidebarDrag+dx, 200), 520)
+	} else if w.sidebarDrag != 0 && !h.Pressed() {
+		w.sidebarDrag = 0
+		w.save()
+	}
+	if h.DoubleClicked() {
+		w.sidebar = 264
+		w.save()
+	}
+}
+
 func (w *Window) sidebarView(c *ui.Context) {
 	lk := lookFor(c)
 	// the host list is a card as the file sidebar and the terminal are,
 	// inset from the window's left and bottom edges
 	ui.Column(c).Fill().Padding(0, 0, 10, 10).Children(func() {
-		w.card(c, lk).Children(func() {
+		card := w.card(c, lk)
+		// no border on the side facing the terminal: no divider line
+		card.BorderWidth(1, 0, 1, 1)
+		card.Children(func() {
 			ui.Row(c).FillWidth().Padding(8, 8, 4, 8).Children(func() {
 				ui.SearchField(c, &w.sideQuery).FillWidth().Placeholder(locales.SidebarSearch())
 			})
@@ -619,9 +667,8 @@ func (w *Window) hostRow(c *ui.Context, lk *look, conf Config, tabs []int) {
 // sessionRow is one open terminal under its host.
 func (w *Window) sessionRow(c *ui.Context, lk *look, index int, tab *Tab) {
 	selected := index == w.selected
-	row := ui.Row(c).FillWidth().Height(30).Padding(0, 8, 0, 34).Gap(6).Radius(6).
+	row := ui.Row(c).FillWidth().Height(30).Padding(0, 8).Gap(8).Radius(6).
 		AlignItems(ui.Center).Cursor(ui.CursorPointer)
-	row.BorderWidth(0, 0, 0, 2).BorderColor(ui.Transparent)
 	hovered := row.Hovered()
 	sum, hasStatus := programRecord{}, false
 	if tab.status != nil {
@@ -631,7 +678,6 @@ func (w *Window) sessionRow(c *ui.Context, lk *look, index int, tab *Tab) {
 	switch {
 	case selected:
 		row.Background(lk.accentSoft)
-		row.BorderColor(lk.accent)
 	case hovered:
 		row.Background(lk.rowHover)
 	}
@@ -648,11 +694,13 @@ func (w *Window) sessionRow(c *ui.Context, lk *look, index int, tab *Tab) {
 			w.removeTab(tab)
 		}
 	}).Children(func() {
-		if hasStatus {
-			w.statusMark(c, lk, sum, 12)
-		} else {
-			ui.Icon(c, iconTerminal).Size(12, 12).TextColor(lk.textFaint)
-		}
+		ui.Box(c).Size(24, 24).Center().Children(func() {
+			if hasStatus {
+				w.statusMark(c, lk, sum, 13)
+			} else {
+				ui.Icon(c, iconTerminal).Size(13, 13).TextColor(lk.textFaint)
+			}
+		})
 		fg := lk.textMuted
 		if selected {
 			fg = lk.text
@@ -813,7 +861,12 @@ func (w *Window) contentView(c *ui.Context) {
 	if len(w.tabs) == 0 {
 		w.syncTitle("")
 		ui.Column(c).Fill().MinHeight(0).Padding(0, 10, 10, 6).Children(func() {
-			w.card(c, lk).Children(func() {
+			card := w.card(c, lk)
+			if w.showSidebar {
+				// the edge beside the host list keeps no line
+				card.BorderWidth(1, 1, 1, 0)
+			}
+			card.Children(func() {
 				ui.Column(c).Fill().Center().Padding(24).Children(func() {
 					ui.Box(c).Size(52, 52).Radius(14).Center().Background(lk.chip).Margin(0, 0, 18, 0).Children(func() {
 						ui.Icon(c, iconTerminal).Size(26, 26).TextColor(lk.textMuted)
@@ -847,8 +900,12 @@ func (w *Window) contentView(c *ui.Context) {
 			right = 0
 		}
 		ui.Column(c).FillHeight().Grow(1).Basis(0).MinWidth(0).Padding(0, right, 10, 6).Children(func() {
-			w.card(c, lk).Children(func() {
-				w.findBar(c, tab)
+			card := w.card(c, lk)
+			if w.showSidebar {
+				// no line between the host list and the terminal
+				card.BorderWidth(1, 1, 1, 0)
+			}
+			card.Children(func() {
 				terminal.View(c, tab.term).Fill().Grow(1).AutoFocus()
 				w.commandBar(c, lk)
 			})
@@ -1387,7 +1444,7 @@ func (w *Window) setAppearance(kind string) {
 }
 
 // findBar shows the find bar of the selected terminal, and runs its search.
-func (w *Window) findBar(c *ui.Context, tab *Tab) {
+func (w *Window) findBar(c *ui.Context, lk *look, tab *Tab) {
 	// a search going on in a tab that is no longer shown ends here
 	if w.findTab != nil && w.findTab != tab {
 		w.findTab.term.EndSearch()
@@ -1413,10 +1470,9 @@ func (w *Window) findBar(c *ui.Context, tab *Tab) {
 		}
 	}
 
-	lk := lookFor(c)
-	ui.Row(c).FillWidth().Height(40).Padding(0, 10).Gap(8).AlignItems(ui.Center).
-		BorderWidth(0, 0, 1, 0).BorderColor(lk.divider).Children(func() {
-		if ui.SearchField(c, &w.findQuery).Width(240).Changed() {
+	ui.Row(c).Height(26).Shrink(0).Gap(4).AlignItems(ui.Center).Padding(0, 6).Radius(6).
+		Background(lk.chip).Children(func() {
+		if ui.SearchField(c, &w.findQuery).Width(160).Height(24).Changed() {
 			if w.findQuery != w.findLastQuery {
 				w.findLastQuery = w.findQuery
 				w.findTotal, w.findSel, w.findSearching = 0, 0, true
@@ -1426,16 +1482,69 @@ func (w *Window) findBar(c *ui.Context, tab *Tab) {
 		switch {
 		case w.findQuery == "":
 		case w.findSearching:
-			ui.Text(c, locales.FindSearching()).FontSize(12.5).TextColor(lk.textMuted)
+			ui.Text(c, locales.FindSearching()).FontSize(11.5).TextColor(lk.textMuted).SingleLine()
 		case w.findTotal == 0:
-			ui.Text(c, locales.FindNoMatches()).FontSize(12.5).TextColor(lk.textMuted)
+			ui.Text(c, locales.FindNoMatches()).FontSize(11.5).TextColor(lk.textMuted).SingleLine()
 		default:
-			ui.Textf(c, "%s", locales.FindOf(w.findSel, w.findTotal)).FontSize(12.5).TextColor(lk.textMuted)
+			ui.Textf(c, "%s", locales.FindOf(w.findSel, w.findTotal)).FontSize(11.5).TextColor(lk.textMuted).SingleLine()
 		}
-		ui.Spacer(c)
 		w.rowButton(c, lk, iconChevronUp, locales.TooltipPrevMatch(), term.SearchPrevious)
 		w.rowButton(c, lk, iconChevronDown, locales.TooltipNextMatch(), term.SearchNext)
 		w.rowButton(c, lk, iconClose, locales.TooltipCloseFind(), func() { w.findOpen = false })
+	})
+}
+
+// stopFind closes the find bar and ends its search.
+func (w *Window) stopFind() {
+	if w.findTab != nil {
+		w.findTab.term.EndSearch()
+	}
+	w.findOpen, w.findOn, w.findTab, w.findLastQuery = false, false, nil, ""
+	w.findTotal, w.findSel, w.findSearching = 0, 0, false
+}
+
+// availableUpdate is the version found by the updater, "" when no updater
+// plugin runs, as in a view built by a test.
+func availableUpdate() (version string) {
+	defer func() { _ = recover() }()
+	return updater.AvailableVersion()
+}
+
+// aboutDialog tells the running version and offers the update check.
+func (w *Window) aboutDialog(c *ui.Context) {
+	lk := lookFor(c)
+	ui.Modal(c, &w.aboutOpen, func() {
+		ui.Column(c).Width(440).Padding(20).Gap(12).Children(func() {
+			dialogHeading(c, APP_NAME)
+			version := mygo.App.Version()
+			if version == "" {
+				version = "dev"
+			}
+			ui.Text(c, locales.AboutVersion(version)).FontSize(12).TextColor(lk.textMuted).SingleLine()
+			ui.Text(c, locales.AboutBody()).FontSize(12.5).TextColor(lk.textMuted).LineHeight(1.4)
+			if v := availableUpdate(); v != "" {
+				ui.Row(c).FillWidth().Height(38).Padding(0, 10).Gap(8).Radius(8).
+					Background(lk.accentSoft).AlignItems(ui.Center).Children(func() {
+					ui.Icon(c, iconDownload).Size(14, 14).TextColor(lk.accent)
+					ui.Text(c, locales.UpdateAvailable(v)).FontSize(12.5).TextColor(lk.text).
+						Grow(1).SingleLine().Ellipsis("…")
+					if ui.Button(c, locales.AboutUpdateCheck()).Clicked() {
+						w.aboutOpen = false
+						updater.CheckForUpdates()
+					}
+				})
+			}
+			ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+				if ui.Button(c, locales.AboutUpdateCheck()).Clicked() {
+					w.aboutOpen = false
+					updater.CheckForUpdates()
+				}
+				ui.Spacer(c)
+				if ui.Button(c, locales.BtnOK()).Clicked() {
+					w.aboutOpen = false
+				}
+			})
+		})
 	})
 }
 
@@ -1445,9 +1554,7 @@ func (w *Window) dialogs(c *ui.Context) {
 	if w.errOpen {
 		ui.AlertDialog(c, &w.errOpen, locales.AlertError(), w.errMsg, locales.BtnOK())
 	}
-	if w.aboutOpen {
-		ui.AlertDialog(c, &w.aboutOpen, APP_NAME, locales.AboutBody(), locales.BtnOK())
-	}
+	w.aboutDialog(c)
 	if w.delOpen {
 		switch ui.AlertDialog(c, &w.delOpen, w.delTitle, w.delMsg, locales.BtnCancel(), locales.BtnDelete()) {
 		case 1:

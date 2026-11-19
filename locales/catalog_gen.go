@@ -1463,3 +1463,33 @@ func AboutBody() string { return In(i18n.Locale()).AboutBody() }
 func (msgs Messages) AboutBody() string {
 	return Catalog.Format(msgs.locale, "aboutBody", nil)
 }
+
+// AboutVersion says "Version {version}"
+// in the language the app shows.
+func AboutVersion(version string) string { return In(i18n.Locale()).AboutVersion(version) }
+
+// AboutVersion says "Version {version}"
+// in the language of msgs.
+func (msgs Messages) AboutVersion(version string) string {
+	return Catalog.Format(msgs.locale, "aboutVersion", map[string]any{"version": version})
+}
+
+// AboutUpdateCheck says "Check for Updates…"
+// in the language the app shows.
+func AboutUpdateCheck() string { return In(i18n.Locale()).AboutUpdateCheck() }
+
+// AboutUpdateCheck says "Check for Updates…"
+// in the language of msgs.
+func (msgs Messages) AboutUpdateCheck() string {
+	return Catalog.Format(msgs.locale, "aboutUpdateCheck", nil)
+}
+
+// UpdateAvailable says "Version {version} is available"
+// in the language the app shows.
+func UpdateAvailable(version string) string { return In(i18n.Locale()).UpdateAvailable(version) }
+
+// UpdateAvailable says "Version {version} is available"
+// in the language of msgs.
+func (msgs Messages) UpdateAvailable(version string) string {
+	return Catalog.Format(msgs.locale, "updateAvailable", map[string]any{"version": version})
+}

@@ -214,6 +214,7 @@ type appFile struct {
 	Appearance    string            `json:"appearance,omitempty"`
 	TerminalTheme string            `json:"terminalTheme,omitempty"`
 	SidebarHidden bool              `json:"sidebarHidden,omitempty"`
+	SidebarWidth  float32           `json:"sidebarWidth,omitempty"`
 	FilesHidden   bool              `json:"filesHidden,omitempty"`
 	FilesWidth    float32           `json:"filesWidth,omitempty"`
 	FollowDir     *bool             `json:"followDir,omitempty"`
@@ -267,6 +268,9 @@ func (w *Window) load() error {
 	w.appTheme = f.Appearance
 	w.termThemeName = f.TerminalTheme
 	w.showSidebar = !f.SidebarHidden
+	if f.SidebarWidth > 0 {
+		w.sidebar = min(max(f.SidebarWidth, 200), 520)
+	}
 	w.showFiles = !f.FilesHidden
 	if f.FilesWidth > 0 {
 		w.filesWidth = min(max(f.FilesWidth, 200), 560)

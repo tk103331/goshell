@@ -49,6 +49,8 @@ func main() {
 		if err := w.win.SetIcon(iconPNG); err != nil {
 			log.Println(err)
 		}
+		// an update check found a version: show the reminder in the view
+		updater.OnChange(func() { w.invalidate() })
 		// the language changed (View > Language, or the user's languages):
 		// say the menus in it again
 		mygo.App.OnLocaleChanged(func(string) { setMenus(w) })

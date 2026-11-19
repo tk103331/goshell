@@ -32,6 +32,8 @@ remembers the hosts in a sidebar.
 - Finds a local Docker daemon and adds a config for it on first launch.
 - Program status (OSC 7501): session row icons show what long-running
   programs are doing; hover for the message.
+- Find in the title bar, and a download reminder in it when an update is
+  available.
 - Signed automatic updates from GitHub releases, with Help > Check for
   Updates…
 
@@ -51,6 +53,9 @@ remembers the hosts in a sidebar.
 
 ### Program status
 ![GoShell program status](screenshot/program-status.png)
+
+### Find
+![GoShell find](screenshot/find.png)
 
 ### File sidebar
 ![GoShell file sidebar](screenshot/files.png)
@@ -152,8 +157,8 @@ rsync -a ~/Photos backup:/photos && status done "Photos synced" || status error 
 
 The foot of the host sidebar has a moon or sun button that switches between
 the light and the dark appearance, a `中文`/`EN` button that switches the
-language, and About. The title bar holds Find and the file sidebar toggle;
-New Command is in the File menu. The View menu has the same choices, with
+language, and About. The title bar holds Find, the file sidebar toggle and,
+when there is one, an update reminder; New Command is in the File menu. The View menu has the same choices, with
 "System" to follow the desktop's appearance and languages.
 
 View > Terminal Theme… chooses one of the themes Ghostty ships, or returns
@@ -172,7 +177,9 @@ deleted.
 Packaged builds check the [latest GitHub release](https://github.com/tk103331/goshell/releases)
 for updates in the background, and Help > Check for Updates… asks right away.
 The native update window shows the version and notes, then downloads, verifies
-and installs the signed update and offers to relaunch.
+and installs the signed update and offers to relaunch. Help > About shows the
+running version; when a check finds a newer one, a download chip appears in
+the title bar as well.
 
 The update files are signed with the Ed25519 key whose public half is in
 `mygo.json` (`updates.publicKey`). `mygo build` reads the private half from
