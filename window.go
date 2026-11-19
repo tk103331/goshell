@@ -16,7 +16,7 @@ import (
 	"goshell/locales"
 )
 
-const APP_NAME = "Go Shell"
+const APP_NAME = "GoShell"
 
 // Window holds the state of the app: the sessions and shortcut commands it
 // saved, the open terminal tabs, and the state of its dialogs.
@@ -88,6 +88,8 @@ type Window struct {
 
 	// theme
 	appTheme        string // the appearance: "", "light" or "dark"
+	colorTheme      string // the chrome color theme
+	colorOpen       bool   // the color theme dialog shows
 	themeOpen       bool
 	themeQuery      string
 	themeNames      []string
@@ -107,6 +109,7 @@ func newWindow() *Window {
 		sidebar:         264,
 		showSidebar:     true,
 		showFiles:       true,
+		colorTheme:      "paper",
 		filesWidth:      280,
 		followDir:       true,
 		cmdEdit:         -1,
@@ -535,6 +538,7 @@ func (w *Window) sidebarFooter(c *ui.Context, lk *look) {
 	ui.Row(c).FillWidth().Height(40).Padding(0, 8).Gap(2).AlignItems(ui.Center).
 		BorderWidth(1, 0, 0, 0).BorderColor(lk.divider).Children(func() {
 		w.barButton(c, iconInfo, locales.MenuAbout(), func() { w.aboutOpen = true })
+		w.barButton(c, iconPalette, locales.ColorThemeButton(), func() { w.colorOpen = true })
 		if c.Theme().Dark {
 			w.barButton(c, iconSun, locales.SwitchToLight(), w.toggleAppearance)
 		} else {
@@ -1510,6 +1514,89 @@ func availableUpdate() (version string) {
 	return updater.AvailableVersion()
 }
 
+// colorThemeLabel names a color theme in the app's language.
+func colorThemeLabel(id string) string {
+	switch id {
+	case "ocean":
+		return locales.ColorThemeOcean()
+	case "forest":
+		return locales.ColorThemeForest()
+	case "sunset":
+		return locales.ColorThemeSunset()
+	case "violet":
+		return locales.ColorThemeViolet()
+	case "mono":
+		return locales.ColorThemeMono()
+	}
+	return locales.ColorThemePaper()
+}
+
+// colorThemeDialog lists the app's color themes with a small preview of each.
+func (w *Window) colorThemeDialog(c *ui.Context) {
+	lk := lookFor(c)
+	ui.Modal(c, &w.colorOpen, func() {
+		ui.Column(c).Width(500).Padding(20).Gap(12).Children(func() {
+			dialogHeading(c, locales.ColorThemeTitle())
+			ui.Text(c, locales.ColorThemeHint()).FontSize(12).TextColor(lk.textMuted)
+			ui.Scroll(c).MaxHeight(410).Children(func() {
+				ui.Column(c).FillWidth().Gap(2).Children(func() {
+					dark := c.Theme().Dark
+					for _, th := range colorThemes {
+						th := th
+						selected := w.colorTheme == th.id
+						row := ui.Row(c).FillWidth().Height(58).Padding(0, 8).Gap(10).Radius(8).
+							AlignItems(ui.Center).Cursor(ui.CursorPointer)
+						switch {
+						case selected:
+							row.Background(lk.accentSoft)
+						case row.Hovered():
+							row.Background(lk.rowHover)
+						}
+						row.Children(func() {
+							preview := th.light
+							if dark {
+								preview = th.dark
+							}
+							w.colorThemePreview(c, preview)
+							ui.Text(c, colorThemeLabel(th.id)).FontSize(13).FontWeight(550).
+								TextColor(lk.text).Grow(1).SingleLine()
+							if selected {
+								ui.Icon(c, iconCheck).Size(14, 14).TextColor(lk.accent)
+							}
+						})
+						if row.Clicked() {
+							w.colorTheme = applyColorTheme(th.id)
+							w.save()
+						}
+					}
+				})
+			})
+			ui.Row(c).Gap(8).Children(func() {
+				ui.Spacer(c)
+				if ui.Button(c, locales.BtnOK()).Clicked() {
+					w.colorOpen = false
+				}
+			})
+		})
+	})
+}
+
+// colorThemePreview is a small window in a theme's colors: its wash, two
+// cards, an accent, and a chosen row.
+func (w *Window) colorThemePreview(c *ui.Context, th *look) {
+	ui.Box(c).Size(78, 44).Radius(9).Clip().Background(th.wash).
+		Border(1, th.cardBorder).Children(func() {
+		ui.Box(c).Absolute().Left(6).Top(7).Width(30).Height(30).Radius(5).Background(th.card)
+		ui.Box(c).Absolute().Left(9).Top(11).Width(16).Height(4).Radius(2).Background(th.accent)
+		ui.Box(c).Absolute().Left(9).Top(19).Width(11).Height(3).Radius(1.5).Background(th.textFaint)
+		ui.Box(c).Absolute().Left(6).Top(28).Width(30).Height(9).Radius(3).Background(th.accentSoft)
+		ui.Box(c).Absolute().Right(6).Top(7).Width(28).Height(30).Radius(5).Background(th.card)
+		ui.Box(c).Absolute().Right(9).Top(11).Width(12).Height(3).Radius(1.5).Background(th.accent)
+		ui.Box(c).Absolute().Right(9).Top(17).Width(17).Height(3).Radius(1.5).Background(th.rowHover)
+		ui.Box(c).Absolute().Right(9).Top(23).Width(9).Height(3).Radius(1.5).Background(th.textMuted)
+	})
+}
+
 // aboutDialog tells the running version and offers the update check.
 func (w *Window) aboutDialog(c *ui.Context) {
 	lk := lookFor(c)
@@ -1561,6 +1648,7 @@ func (w *Window) dialogs(c *ui.Context) {
 			w.delFn()
 		}
 	}
+	w.colorThemeDialog(c)
 	w.themeDialog(c)
 	w.configDialog(c)
 	w.cmdDialog(c)

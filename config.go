@@ -212,6 +212,7 @@ type appFile struct {
 	Sessions      []json.RawMessage `json:"sessions"`
 	Commands      []*Cmd            `json:"commands"`
 	Appearance    string            `json:"appearance,omitempty"`
+	ColorTheme    string            `json:"colorTheme,omitempty"`
 	TerminalTheme string            `json:"terminalTheme,omitempty"`
 	SidebarHidden bool              `json:"sidebarHidden,omitempty"`
 	SidebarWidth  float32           `json:"sidebarWidth,omitempty"`
@@ -266,6 +267,11 @@ func (w *Window) load() error {
 	}
 	w.cmds = f.Commands
 	w.appTheme = f.Appearance
+	w.colorTheme = f.ColorTheme
+	if w.colorTheme == "" {
+		w.colorTheme = "paper"
+	}
+	w.colorTheme = applyColorTheme(w.colorTheme)
 	w.termThemeName = f.TerminalTheme
 	w.showSidebar = !f.SidebarHidden
 	if f.SidebarWidth > 0 {

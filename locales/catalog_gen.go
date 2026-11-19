@@ -144,6 +144,96 @@ func (msgs Messages) MenuAppearance() string {
 	return Catalog.Format(msgs.locale, "menuAppearance", nil)
 }
 
+// ColorThemeButton says "Color theme"
+// in the language the app shows.
+func ColorThemeButton() string { return In(i18n.Locale()).ColorThemeButton() }
+
+// ColorThemeButton says "Color theme"
+// in the language of msgs.
+func (msgs Messages) ColorThemeButton() string {
+	return Catalog.Format(msgs.locale, "colorThemeButton", nil)
+}
+
+// ColorThemeTitle says "Color Theme"
+// in the language the app shows.
+func ColorThemeTitle() string { return In(i18n.Locale()).ColorThemeTitle() }
+
+// ColorThemeTitle says "Color Theme"
+// in the language of msgs.
+func (msgs Messages) ColorThemeTitle() string {
+	return Catalog.Format(msgs.locale, "colorThemeTitle", nil)
+}
+
+// ColorThemeHint says "Choose the color of the app's chrome."
+// in the language the app shows.
+func ColorThemeHint() string { return In(i18n.Locale()).ColorThemeHint() }
+
+// ColorThemeHint says "Choose the color of the app's chrome."
+// in the language of msgs.
+func (msgs Messages) ColorThemeHint() string {
+	return Catalog.Format(msgs.locale, "colorThemeHint", nil)
+}
+
+// ColorThemePaper says "Paper"
+// in the language the app shows.
+func ColorThemePaper() string { return In(i18n.Locale()).ColorThemePaper() }
+
+// ColorThemePaper says "Paper"
+// in the language of msgs.
+func (msgs Messages) ColorThemePaper() string {
+	return Catalog.Format(msgs.locale, "colorThemePaper", nil)
+}
+
+// ColorThemeOcean says "Ocean"
+// in the language the app shows.
+func ColorThemeOcean() string { return In(i18n.Locale()).ColorThemeOcean() }
+
+// ColorThemeOcean says "Ocean"
+// in the language of msgs.
+func (msgs Messages) ColorThemeOcean() string {
+	return Catalog.Format(msgs.locale, "colorThemeOcean", nil)
+}
+
+// ColorThemeForest says "Forest"
+// in the language the app shows.
+func ColorThemeForest() string { return In(i18n.Locale()).ColorThemeForest() }
+
+// ColorThemeForest says "Forest"
+// in the language of msgs.
+func (msgs Messages) ColorThemeForest() string {
+	return Catalog.Format(msgs.locale, "colorThemeForest", nil)
+}
+
+// ColorThemeSunset says "Sunset"
+// in the language the app shows.
+func ColorThemeSunset() string { return In(i18n.Locale()).ColorThemeSunset() }
+
+// ColorThemeSunset says "Sunset"
+// in the language of msgs.
+func (msgs Messages) ColorThemeSunset() string {
+	return Catalog.Format(msgs.locale, "colorThemeSunset", nil)
+}
+
+// ColorThemeViolet says "Violet"
+// in the language the app shows.
+func ColorThemeViolet() string { return In(i18n.Locale()).ColorThemeViolet() }
+
+// ColorThemeViolet says "Violet"
+// in the language of msgs.
+func (msgs Messages) ColorThemeViolet() string {
+	return Catalog.Format(msgs.locale, "colorThemeViolet", nil)
+}
+
+// ColorThemeMono says "Monochrome"
+// in the language the app shows.
+func ColorThemeMono() string { return In(i18n.Locale()).ColorThemeMono() }
+
+// ColorThemeMono says "Monochrome"
+// in the language of msgs.
+func (msgs Messages) ColorThemeMono() string {
+	return Catalog.Format(msgs.locale, "colorThemeMono", nil)
+}
+
 // MenuToggleAppearance says "Toggle Light/Dark"
 // in the language the app shows.
 func MenuToggleAppearance() string { return In(i18n.Locale()).MenuToggleAppearance() }

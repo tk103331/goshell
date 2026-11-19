@@ -36,6 +36,8 @@ var (
 		`<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>`)))
 	iconDownload = ui.MustParseSVG([]byte(withIconBody(
 		`<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>`)))
+	iconPalette = ui.MustParseSVG([]byte(withIconBody(
+		`<path d="M12 22a10 10 0 1 1 0-20c4.4 0 8 2.7 8 6 0 2.2-1.8 4-4 4h-1.5a2 2 0 0 0 0 4c0 3.3-2.7 6-6 6z"/><circle cx="8" cy="10" r="1"/><circle cx="12" cy="7.5" r="1"/><circle cx="16" cy="10" r="1"/>`)))
 	iconKey = ui.MustParseSVG([]byte(withIconBody(
 		`<path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/>`)))
 	iconServer = ui.MustParseSVG([]byte(withIconBody(

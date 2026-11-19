@@ -24,6 +24,7 @@ func main() {
 	mygo.Use(native.Plugin)
 	mygo.App.SetName(APP_NAME)
 	mygo.App.WhenReady(func() {
+		migrateUserData()
 		w := newWindow()
 		if err := w.load(); err != nil {
 			log.Println(err)

@@ -91,12 +91,79 @@ var darkLook = look{
 	successSoft:   ui.RGBA(79, 209, 122, 0.12),
 }
 
+// colorTheme is one of the app's color schemes, in the light and dark
+// appearances: the wash under the chrome, and the accent of selections and
+// controls. The card keeps its face, so terminals do not change color.
+type colorTheme struct {
+	id          string
+	light, dark *look
+}
+
+func newColorTheme(id, lightWash, darkWash, lightAccent, darkAccent string) colorTheme {
+	l, d := lightLook, darkLook
+	l.wash = ui.Hex(lightWash)
+	l.accent = ui.Hex(lightAccent)
+	l.accentSoft = ui.Hex(lightAccent).Alpha(0.10)
+	d.wash = ui.Hex(darkWash)
+	d.accent = ui.Hex(darkAccent)
+	d.accentSoft = ui.Hex(darkAccent).Alpha(0.14)
+	return colorTheme{id: id, light: &l, dark: &d}
+}
+
+var colorThemes = []colorTheme{
+	{id: "paper", light: &lightLook, dark: &darkLook},
+	newColorTheme("ocean", "#e7eef9", "#0f1720", "#2563eb", "#60a5fa"),
+	newColorTheme("forest", "#e9f2ec", "#0f1713", "#16a34a", "#4ade80"),
+	newColorTheme("sunset", "#f5ede6", "#1a1310", "#e0603a", "#ff8a5c"),
+	newColorTheme("violet", "#efeaf7", "#171320", "#7c3aed", "#a78bfa"),
+	newColorTheme("mono", "#f0f0f2", "#151517", "#4b5563", "#a1a1aa"),
+}
+
+var (
+	activeColorTheme = "paper"
+	activeLightLook  = &lightLook
+	activeDarkLook   = &darkLook
+)
+
+func colorThemeByID(id string) *colorTheme {
+	for i := range colorThemes {
+		if colorThemes[i].id == id {
+			return &colorThemes[i]
+		}
+	}
+	return nil
+}
+
+// applyColorTheme makes a color theme the one the window draws, and colors
+// its controls' accent with it. It returns the theme's id, or "paper" for
+// one it does not know.
+func applyColorTheme(id string) string {
+	th := colorThemeByID(id)
+	if th == nil {
+		th, id = colorThemeByID("paper"), "paper"
+	}
+	activeColorTheme = id
+	activeLightLook, activeDarkLook = th.light, th.dark
+
+	themeLight.Accent = th.light.accent
+	themeLight.AccentHover = th.light.accent
+	themeLight.AccentPressed = th.light.accent
+	themeLight.Focus = th.light.accent.Alpha(0.55)
+	themeLight.Selection = th.light.accent.Alpha(0.22)
+	themeDark.Accent = th.dark.accent
+	themeDark.AccentHover = th.dark.accent
+	themeDark.AccentPressed = th.dark.accent
+	themeDark.Focus = th.dark.accent.Alpha(0.60)
+	themeDark.Selection = th.dark.accent.Alpha(0.35)
+	return id
+}
+
 // lookFor is the chrome color of the window c draws.
 func lookFor(c *ui.Context) *look {
 	if c.Theme().Dark {
-		return &darkLook
+		return activeDarkLook
 	}
-	return &lightLook
+	return activeLightLook
 }
 
 // themeLight and themeDark color the controls and dialogs on the card's

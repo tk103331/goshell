@@ -20,7 +20,7 @@ Docker 和 Kubernetes 主机，在主机下打开终端会话，并把这些主�
 - Docker 容器选择支持搜索、镜像、状态展示和点击连接。
 - Kubernetes 选择框支持搜索命名空间、Pod、容器，并自动选择默认项。
 - 快捷命令以 Chip 显示在终端下方，支持实时预览、图标选择和悬停删除角标。
-- 支持浅色 / 深色主题，默认跟随系统。
+- 支持六种颜色主题并提供效果预览，浅色 / 深色外观默认跟随系统。
 - 支持 Ghostty 终端主题。
 - 支持英文和简体中文。
 - 支持 Windows、Linux、macOS，感谢 [MyGo](https://github.com/egoist/mygo)。
@@ -38,6 +38,9 @@ Docker 和 Kubernetes 主机，在主机下打开终端会话，并把这些主�
 
 ### 深色主题
 ![GoShell 深色主题](screenshot/dark.png)
+
+### 颜色主题
+![GoShell 颜色主题](screenshot/color-theme.png)
 
 ### 新建会话
 ![GoShell 新建会话](screenshot/new-session.png)
@@ -138,8 +141,8 @@ rsync -a ~/Photos backup:/photos && status done "Photos synced" || status error 
 
 # 外观与语言
 
-主机侧栏底部有月亮 / 太阳按钮用于切换浅色和深色主题，`中文`/`EN` 按钮用于
-切换语言，以及关于按钮。标题栏包含查找、文件边栏按钮，以及可用更新提醒；
+主机侧栏底部有调色板按钮，用于打开带效果预览的颜色主题选择框；还有月亮 /
+太阳按钮切换浅色和深色主题，`中文`/`EN` 按钮切换语言，以及关于按钮。标题栏包含查找、文件边栏按钮，以及可用更新提醒；
 新建快捷命令位于 File 菜单中。View 菜单提供相同的主题、语言和终端主题选项，
 “System” 表示跟随系统外观和语言。
 

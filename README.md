@@ -24,7 +24,8 @@ remembers the hosts in a sidebar.
   sensible defaults.
 - Shortcut commands as chips under the terminal, with a live preview, an
   icon picker and a delete badge on hover.
-- Light and dark appearance, following the system by default.
+- Six color themes with previews, beside the light and dark appearance that
+  follows the system by default.
 - Ghostty terminal themes.
 - English and Simplified Chinese.
 - Windows, Linux and macOS, thanks to [MyGo](https://github.com/egoist/mygo).
@@ -44,6 +45,9 @@ remembers the hosts in a sidebar.
 
 ### Dark appearance
 ![GoShell dark](screenshot/dark.png)
+
+### Color theme
+![GoShell color theme](screenshot/color-theme.png)
 
 ### New session
 ![GoShell new session](screenshot/new-session.png)
@@ -155,9 +159,10 @@ rsync -a ~/Photos backup:/photos && status done "Photos synced" || status error 
 
 # Appearance and language
 
-The foot of the host sidebar has a moon or sun button that switches between
-the light and the dark appearance, a `中文`/`EN` button that switches the
-language, and About. The title bar holds Find, the file sidebar toggle and,
+The foot of the host sidebar has a palette button that opens the color themes
+with a preview of each, a moon or sun button that switches between the light
+and the dark appearance, a `中文`/`EN` button that switches the language, and
+About. The title bar holds Find, the file sidebar toggle and,
 when there is one, an update reminder; New Command is in the File menu. The View menu has the same choices, with
 "System" to follow the desktop's appearance and languages.
 
