@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.1] - 2026-11-19
+
+### Changed
+
+- Updated `golang.org/x/crypto` to v0.59.0.
+- Updated the Kubernetes client libraries to v0.37.2
+  (`k8s.io/client-go`, `k8s.io/api` and `k8s.io/apimachinery`).
+
 ## [0.4.0] - 2026-11-19
 
 ### Added
