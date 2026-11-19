@@ -2,7 +2,7 @@
   "name": "GoShell",
   "slug": "goshell",
   "identifier": "com.github.tk103331.goshell",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "linux": {
     "webview": false,
     "comment": "A simple terminal GUI client for SSH, Docker and K8S.",

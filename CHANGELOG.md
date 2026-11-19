@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.3] - 2026-11-19
+
+### Added
+
+- Six color themes with a small effect preview: Paper, Ocean, Forest,
+  Sunset, Violet and Monochrome. The palette button at the foot of the host
+  sidebar applies one at once, and the choice is saved.
+
+### Changed
+
+- The packaged application is now named `GoShell`, without the space. On
+  first launch, settings and updater preferences move from the old
+  `Go Shell` data directory to `GoShell`; the old copy stays.
+
 ## [0.4.2] - 2026-11-19
 
 ### Changed
