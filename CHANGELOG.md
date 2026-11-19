@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.2] - 2026-11-19
+
+### Changed
+
+- The Find bar now sits at the right of the title bar instead of above the
+  terminal.
+- The host sidebar and the central card no longer show a divider line.
+- Sessions under a host line up with the host's icons and text, without an
+  extra indent.
+- About shows the running version and offers Check for Updates….
+- A download reminder appears in the title bar when an update is available.
+- The host sidebar's width is now saved between launches.
+
 ## [0.4.1] - 2026-11-19
 
 ### Changed
