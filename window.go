@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"path"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -31,16 +34,18 @@ type Window struct {
 	tabs     []*Tab
 	selected int
 
-	sidebar     float32 // the width of the sidebar, in DIPs
-	sidebarDrag float32 // the width as a drag of its edge began, 0 while none
-	showSidebar bool    // the sidebar of sessions shows
-	lastTitle   string  // the window title last shown
+	sidebar       float32 // the width of the sidebar, in DIPs
+	sidebarResize bool    // the pointer drags the sidebar's edge
+	showSidebar   bool    // the sidebar of sessions shows
+	lastTitle     string  // the window title last shown
 
 	// the right sidebar of files
-	showFiles  bool
-	filesWidth float32
-	filesDrag  float32 // the width as a drag of its edge began, 0 while none
-	followDir  bool    // the file sidebar follows the terminal's directory
+	showFiles   bool
+	rightView   int // the right sidebar's view: files or git
+	filesWidth  float32
+	filesResize bool   // the pointer drags the file sidebar's edge
+	followDir   bool   // the file sidebar follows the terminal's directory
+	openTemp    string // where copies of remote files open, made on first use
 
 	// dockerDefaultAdded says the app has looked for a local Docker daemon
 	// and added a config for it, or one was already there: it is kept so a
@@ -48,9 +53,11 @@ type Window struct {
 	dockerDefaultAdded bool
 
 	// dialogs
-	aboutOpen bool
-	errOpen   bool
-	errMsg    string
+	filePrompt *filePrompt
+	confirm    *confirmDialog
+	aboutOpen  bool
+	errOpen    bool
+	errMsg     string
 
 	delOpen  bool
 	delTitle string
@@ -99,6 +106,16 @@ type Window struct {
 
 	toast *ui.Toast
 
+	menuSave *mygo.MenuItem
+
+	// the right pane of the middle area: files, pages and commits, side
+	// by side with the terminal
+	paneTabs  []*paneTab
+	paneSel   int
+	paneShare float32
+	gitShare  float32 // the Git view's share for the changes
+	diffSplit bool    // the diffs show side by side, not one over the other
+
 	docker *dockerDialog
 	k8s    *k8sDialog
 }
@@ -112,6 +129,8 @@ func newWindow() *Window {
 		colorTheme:      "paper",
 		filesWidth:      280,
 		followDir:       true,
+		paneShare:       defaultPaneShare,
+		gitShare:        defaultGitShare,
 		cmdEdit:         -1,
 		cmdIcons:        []string{"terminal", "server", "docker", "kubernetes", "cloud", "box", "folder", "file", "document", "computer", "key", "zap", "search", "refresh", "edit", "info"},
 		collapsedHosts:  map[string]bool{},
@@ -173,13 +192,13 @@ func (w *Window) view(c *ui.Context) {
 	lk := lookFor(c)
 
 	ui.Column(c).Fill().Background(lk.wash).Children(func() {
-		w.titleBar(c)
-		ui.Row(c).Fill().MinHeight(0).AlignItems(ui.Stretch).Children(func() {
+		// a strip of the wash above the cards, as beside and below them
+		ui.Row(c).Fill().MinHeight(0).AlignItems(ui.Stretch).Padding(10, 0, 0, 0).Children(func() {
 			if w.showSidebar {
 				ui.Column(c).FillHeight().Width(w.sidebar).Shrink(0).Children(func() {
 					w.sidebarView(c)
 				})
-				w.sidebarHandle(c)
+				w.sidebarHandle(c, lk)
 			}
 			ui.Column(c).FillHeight().Grow(1).Basis(0).MinWidth(0).Children(func() {
 				w.contentView(c)
@@ -190,75 +209,8 @@ func (w *Window) view(c *ui.Context) {
 	w.dialogs(c)
 }
 
-// titleBar draws the whole title bar of the frameless window: the window
-// controls, the tabs of the open terminals, and the actions as icons, over
-// a bar that drags the window (a double click maximizes it). It is 36 DIPs
-// low.
-func (w *Window) titleBar(c *ui.Context) {
-	lk := lookFor(c)
-	const h = 36
-	mac := runtime.GOOS == "darwin"
-
-	ui.Row(c).FillWidth().Height(h).AlignItems(ui.Center).Gap(4).PaddingStart(12).PaddingEnd(6).Children(func() {
-		if mac {
-			// traffic lights: close, minimize, zoom, inset from the corner
-			// as macOS puts its own
-			ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-				w.lightButton(c, "#ff5f57", locales.WinClose(), func() { w.win.Close() })
-				w.lightButton(c, "#febc2e", locales.WinMinimize(), func() { w.win.Minimize() })
-				w.lightButton(c, "#28c840", locales.WinMaximize(), func() { w.win.ToggleMaximize() })
-			})
-			ui.Box(c).Width(6)
-		}
-
-		w.barButton(c, iconPanel, locales.TooltipToggleSidebar(), w.toggleSidebar)
-		w.newSessionButton(c)
-
-		// the room that drags the window, saying which session shows
-		ui.Row(c).Grow(1).FillHeight().DragWindow().Children(func() {
-			ui.Column(c).Fill().Center().Children(func() {
-				title := APP_NAME
-				if tab := w.selectedTab(); tab != nil {
-					title = tab.Name()
-					if tab.cfg != nil {
-						title = tab.cfg.Name() + " · " + title
-					}
-				}
-				ui.Text(c, title).FontSize(12.5).FontWeight(500).TextColor(lk.textFaint).
-					SingleLine().Ellipsis("…").MaxWidth(420)
-			})
-		})
-
-		if v := availableUpdate(); v != "" {
-			b := ui.ButtonBase(c).Height(24).Padding(0, 8).Radius(6).Gap(4).
-				Background(lk.accentSoft).Label(locales.UpdateAvailable(v))
-			b.Children(func() {
-				ui.Icon(c, iconDownload).Size(12, 12).TextColor(lk.accent)
-				ui.Textf(c, "v%s", v).FontSize(11.5).TextColor(lk.accent)
-			})
-			b.Tooltip(locales.UpdateAvailable(v))
-			if b.Clicked() {
-				updater.CheckForUpdates()
-			}
-		}
-		tab := w.selectedTab()
-		if tab != nil {
-			w.findBar(c, lk, tab)
-		} else if w.findOpen || w.findTab != nil {
-			w.stopFind()
-		}
-		if tab == nil || !w.findOpen {
-			w.barButton(c, iconSearch, locales.MenuFind(), w.toggleFind)
-		}
-		w.barButton(c, iconPanelRight, locales.TooltipToggleFiles(), w.toggleFiles)
-
-		if !mac {
-			w.winButtons(c)
-		}
-	})
-}
-
-// lightButton is a traffic light of macOS: a round, colored button.
+// lightButton is a traffic light of macOS: a round, colored button, at the
+// top of the sidebar, or of the middle area when the sidebar is hidden.
 func (w *Window) lightButton(c *ui.Context, color, tip string, fn func()) {
 	b := ui.ButtonBase(c).Size(12, 12).Radius(6).Background(ui.Hex(color))
 	b.Tooltip(tip)
@@ -268,7 +220,7 @@ func (w *Window) lightButton(c *ui.Context, color, tip string, fn func()) {
 }
 
 // winButtons are the window controls of Windows and Linux, at the right
-// end of the title bar.
+// end of the bar that shows them.
 func (w *Window) winButtons(c *ui.Context) {
 	lk := lookFor(c)
 	w.winButton(c, iconMinimize, locales.WinMinimize(), func() { w.win.Minimize() })
@@ -306,8 +258,8 @@ func (w *Window) winButton(c *ui.Context, icon *ui.SVG, tip string, fn func()) {
 	}
 }
 
-// toggleSidebar shows and hides the sidebar of sessions, as the title
-// bar's button and the View menu's Toggle Sidebar do.
+// toggleSidebar shows and hides the sidebar of sessions, as its button in
+// the terminal's title bar and the View menu's Toggle Sidebar do.
 func (w *Window) toggleSidebar() {
 	w.showSidebar = !w.showSidebar
 	w.save()
@@ -414,7 +366,7 @@ func (w *Window) newSessionRow(c *ui.Context, lk *look, conf Config) {
 	}
 }
 
-// barButton is an icon button of the title bar.
+// barButton is a quiet icon button of the window's bars.
 func (w *Window) barButton(c *ui.Context, icon *ui.SVG, tip string, fn func()) {
 	lk := lookFor(c)
 	b := ui.ButtonBase(c).Size(28, 26).Radius(6).Center().Label(tip)
@@ -449,15 +401,19 @@ func (w *Window) plusButton(c *ui.Context, tip string, fn func()) {
 
 // sidebarHandle is the edge between the host list and the terminal, which
 // a drag moves; it draws no line.
-func (w *Window) sidebarHandle(c *ui.Context) {
-	h := ui.Box(c.Key("sidebar-resize")).Width(5).FillHeight().Cursor(ui.CursorResizeColumn)
+func (w *Window) sidebarHandle(c *ui.Context, lk *look) {
+	h := ui.Box(c.Key("sidebar-resize")).Width(8).FillHeight().
+		Cursor(ui.CursorResizeColumn).KeepFocus()
+	if h.Hovered() || h.Pressed() {
+		h.Background(lk.divider)
+	}
 	if dx, _, ok := h.Dragged(); ok {
-		if w.sidebarDrag == 0 {
-			w.sidebarDrag = w.sidebar
-		}
-		w.sidebar = min(max(w.sidebarDrag+dx, 200), 520)
-	} else if w.sidebarDrag != 0 && !h.Pressed() {
-		w.sidebarDrag = 0
+		// a frame can build twice, so each move arrives once with its
+		// distance and once with none: add it, never set the width from it
+		w.sidebar = min(max(w.sidebar+dx, 200), 520)
+		w.sidebarResize = true
+	} else if w.sidebarResize && !h.Pressed() {
+		w.sidebarResize = false
 		w.save()
 	}
 	if h.DoubleClicked() {
@@ -475,6 +431,7 @@ func (w *Window) sidebarView(c *ui.Context) {
 		// no border on the side facing the terminal: no divider line
 		card.BorderWidth(1, 0, 1, 1)
 		card.Children(func() {
+			w.sidebarHeader(c, lk)
 			ui.Row(c).FillWidth().Padding(8, 8, 4, 8).Children(func() {
 				ui.SearchField(c, &w.sideQuery).FillWidth().Placeholder(locales.SidebarSearch())
 			})
@@ -532,11 +489,74 @@ func (w *Window) filterTabs(tabs []int, q string) []int {
 	return out
 }
 
-// sidebarFooter holds the window's actions at the foot of the host list,
-// fixed while the hosts scroll: About, the appearance and the language.
+// sidebarHeader is the top of the session list: the window's controls, the
+// room that drags the window, and the buttons that start a session or add
+// a host.
+func (w *Window) sidebarHeader(c *ui.Context, lk *look) {
+	mac := runtime.GOOS == "darwin"
+	ui.Row(c).FillWidth().Height(36).Shrink(0).PaddingStart(12).PaddingEnd(6).Gap(6).
+		AlignItems(ui.Center).Children(func() {
+		if mac {
+			w.windowControls(c)
+			ui.Box(c).Width(2)
+		}
+		ui.Box(c).Grow(1).FillHeight().DragWindow()
+		w.newSessionButton(c)
+		w.newHostButton(c)
+		if !mac {
+			w.windowControls(c)
+		}
+	})
+}
+
+// windowControls draws the window's controls, for a window with no title
+// bar of its own: the traffic lights on macOS, and minimize, maximize and
+// close elsewhere.
+func (w *Window) windowControls(c *ui.Context) {
+	if runtime.GOOS == "darwin" {
+		ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
+			w.lightButton(c, "#ff5f57", locales.WinClose(), func() { w.win.Close() })
+			w.lightButton(c, "#febc2e", locales.WinMinimize(), func() { w.win.Minimize() })
+			w.lightButton(c, "#28c840", locales.WinMaximize(), func() { w.win.ToggleMaximize() })
+		})
+		return
+	}
+	w.winButtons(c)
+}
+
+// newHostButton opens the dialog that adds a host.
+func (w *Window) newHostButton(c *ui.Context) {
+	lk := lookFor(c)
+	b := ui.ButtonBase(c).Size(30, 26).Radius(6).Center().Gap(2).Label(locales.MenuNewConfig())
+	if b.Hovered() {
+		b.Background(lk.rowHover)
+	}
+	b.Children(func() {
+		ui.Icon(c, iconServer).Size(14, 14).TextColor(lk.textMuted)
+		ui.Icon(c, iconPlus).Size(7, 7).TextColor(lk.textFaint)
+	})
+	b.Tooltip(locales.MenuNewConfig())
+	if b.Clicked() {
+		w.openCreate()
+	}
+}
+
 func (w *Window) sidebarFooter(c *ui.Context, lk *look) {
 	ui.Row(c).FillWidth().Height(40).Padding(0, 8).Gap(2).AlignItems(ui.Center).
 		BorderWidth(1, 0, 0, 0).BorderColor(lk.divider).Children(func() {
+		if v := availableUpdate(); v != "" {
+			b := ui.ButtonBase(c).Size(26, 26).Radius(6).Center().Label(locales.UpdateAvailable(v))
+			if b.Hovered() {
+				b.Background(lk.accentSoft)
+			}
+			b.Children(func() {
+				ui.Icon(c, iconDownload).Size(14, 14).TextColor(lk.accent)
+			})
+			b.Tooltip(locales.UpdateAvailable(v))
+			if b.Clicked() {
+				updater.CheckForUpdates()
+			}
+		}
 		w.barButton(c, iconInfo, locales.MenuAbout(), func() { w.aboutOpen = true })
 		w.barButton(c, iconPalette, locales.ColorThemeButton(), func() { w.colorOpen = true })
 		if c.Theme().Dark {
@@ -716,6 +736,7 @@ func (w *Window) sessionRow(c *ui.Context, lk *look, index int, tab *Tab) {
 	})
 	if row.Clicked() {
 		w.selected = index
+		w.syncMenus()
 	}
 }
 
@@ -864,6 +885,9 @@ func (w *Window) contentView(c *ui.Context) {
 	lk := lookFor(c)
 	if len(w.tabs) == 0 {
 		w.syncTitle("")
+		if w.findOpen || w.findTab != nil {
+			w.stopFind()
+		}
 		ui.Column(c).Fill().MinHeight(0).Padding(0, 10, 10, 6).Children(func() {
 			card := w.card(c, lk)
 			if w.showSidebar {
@@ -871,7 +895,8 @@ func (w *Window) contentView(c *ui.Context) {
 				card.BorderWidth(1, 1, 1, 0)
 			}
 			card.Children(func() {
-				ui.Column(c).Fill().Center().Padding(24).Children(func() {
+				w.emptyHeader(c, lk)
+				ui.Column(c).FillWidth().Grow(1).Center().Padding(24).Children(func() {
 					ui.Box(c).Size(52, 52).Radius(14).Center().Background(lk.chip).Margin(0, 0, 18, 0).Children(func() {
 						ui.Icon(c, iconTerminal).Size(26, 26).TextColor(lk.textMuted)
 					})
@@ -899,39 +924,128 @@ func (w *Window) contentView(c *ui.Context) {
 	w.syncTitle(tab.Name())
 
 	ui.Row(c).Fill().MinHeight(0).AlignItems(ui.Stretch).Children(func() {
-		right := float32(10)
+		// the handle between the cards is the gap they show, so the
+		// terminal's card keeps no padding on a side a sidebar faces
+		left, right := float32(10), float32(10)
+		if w.showSidebar {
+			left = 0
+		}
 		if w.showFiles {
 			right = 0
 		}
-		ui.Column(c).FillHeight().Grow(1).Basis(0).MinWidth(0).Padding(0, right, 10, 6).Children(func() {
-			card := w.card(c, lk)
-			if w.showSidebar {
-				// no line between the host list and the terminal
-				card.BorderWidth(1, 1, 1, 0)
-			}
-			card.Children(func() {
-				terminal.View(c, tab.term).Fill().Grow(1).AutoFocus()
-				w.commandBar(c, lk)
-			})
-		})
+		if len(w.paneTabs) == 0 {
+			w.terminalView(c, lk, tab, left, right)
+		} else {
+			// the middle area splits into the terminal and the pane
+			w.terminalSplitView(c, lk, tab, left)
+			w.paneHandle(c, lk)
+			w.paneView(c, lk)
+		}
 		if w.showFiles {
 			w.filesPrepare(tab)
-			w.filesHandle(c)
+			w.filesHandle(c, lk)
 			w.filesPanel(c, lk, tab)
 		}
 	})
 }
 
-// filesHandle is the right sidebar's edge, which a drag moves.
-func (w *Window) filesHandle(c *ui.Context) {
-	h := ui.Box(c.Key("files-resize")).Width(5).FillHeight().Cursor(ui.CursorResizeColumn)
-	if dx, _, ok := h.Dragged(); ok {
-		if w.filesDrag == 0 {
-			w.filesDrag = w.filesWidth
+// terminalView is the session's terminal, with its command bar, filling
+// the middle area.
+func (w *Window) terminalView(c *ui.Context, lk *look, tab *Tab, left, right float32) {
+	ui.Column(c).FillHeight().Grow(1).Basis(0).MinWidth(0).Padding(0, right, 10, left).Children(func() {
+		w.terminalCard(c, lk, tab)
+	})
+}
+
+// terminalSplitView is the session's terminal on the left of the split
+// middle area.
+func (w *Window) terminalSplitView(c *ui.Context, lk *look, tab *Tab, left float32) {
+	ui.Column(c).FillHeight().Grow(1-w.paneShare).Basis(0).MinWidth(0).
+		Padding(0, 0, 10, left).Children(func() {
+		w.terminalCard(c, lk, tab)
+	})
+}
+
+// terminalCard is the terminal and its command bar on the card.
+func (w *Window) terminalCard(c *ui.Context, lk *look, tab *Tab) {
+	card := w.card(c, lk)
+	if w.showSidebar {
+		// no line between the host list and the terminal
+		card.BorderWidth(1, 1, 1, 0)
+	}
+	card.Children(func() {
+		w.terminalHeader(c, lk, tab)
+		terminal.View(c, tab.term).Fill().Grow(1).AutoFocus()
+		w.commandBar(c, lk)
+	})
+}
+
+// emptyHeader is the title bar of the card with no session: the window's
+// name, and the sidebars' buttons.
+func (w *Window) emptyHeader(c *ui.Context, lk *look) {
+	mac := runtime.GOOS == "darwin"
+	ui.Row(c).FillWidth().Height(36).Shrink(0).Padding(0, 8).Gap(4).
+		AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(lk.divider).Children(func() {
+		if !w.showSidebar {
+			if mac {
+				ui.Row(c).PaddingStart(4).Children(func() { w.windowControls(c) })
+				ui.Box(c).Width(2)
+			}
 		}
-		w.filesWidth = min(max(w.filesDrag-dx, 200), 560)
-	} else if w.filesDrag != 0 && !h.Pressed() {
-		w.filesDrag = 0
+		w.rowButton(c, lk, iconPanel, locales.TooltipToggleSidebar(), w.toggleSidebar)
+		ui.Text(c, APP_NAME).FontSize(12.5).FontWeight(500).TextColor(lk.textFaint).
+			Grow(1).SingleLine().DragWindow()
+		w.rowButton(c, lk, iconPanelRight, locales.TooltipToggleFiles(), w.toggleFiles)
+		if !w.showSidebar && !mac {
+			w.windowControls(c)
+		}
+	})
+}
+
+// terminalHeader is the terminal's title bar: the sidebars' buttons, the
+// session it shows, and its search, or the search's own field and buttons
+// while it is open.
+func (w *Window) terminalHeader(c *ui.Context, lk *look, tab *Tab) {
+	ui.Row(c).FillWidth().Height(36).Shrink(0).Padding(0, 8).Gap(4).
+		AlignItems(ui.Center).BorderWidth(0, 0, 1, 0).BorderColor(lk.divider).Children(func() {
+		if !w.showSidebar && runtime.GOOS == "darwin" {
+			// the inset the sidebar header gives them, less this bar's
+			ui.Row(c).PaddingStart(4).Children(func() { w.windowControls(c) })
+			ui.Box(c).Width(2)
+		}
+		w.rowButton(c, lk, iconPanel, locales.TooltipToggleSidebar(), w.toggleSidebar)
+		if w.findOpen {
+			w.findBar(c, lk, tab)
+		} else {
+			if tab.cfg != nil {
+				ui.Text(c, tab.cfg.Name()).FontSize(12).TextColor(lk.textFaint).SingleLine()
+				ui.Text(c, "·").FontSize(12).TextColor(lk.textFaint)
+			}
+			ui.Text(c, tab.Name()).FontSize(12.5).FontWeight(500).TextColor(lk.textMuted).
+				Grow(1).SingleLine().Ellipsis("…").DragWindow()
+			w.rowButton(c, lk, iconSearch, locales.MenuFind(), w.toggleFind)
+			if len(w.paneTabs) == 0 {
+				w.rowButton(c, lk, iconPanelRight, locales.TooltipToggleFiles(), w.toggleFiles)
+			}
+		}
+		if !w.showSidebar && runtime.GOOS != "darwin" {
+			w.windowControls(c)
+		}
+	})
+}
+
+// filesHandle is the right sidebar's edge, which a drag moves.
+func (w *Window) filesHandle(c *ui.Context, lk *look) {
+	h := ui.Box(c.Key("files-resize")).Width(8).FillHeight().
+		Cursor(ui.CursorResizeColumn).KeepFocus()
+	if h.Hovered() || h.Pressed() {
+		h.Background(lk.divider)
+	}
+	if dx, _, ok := h.Dragged(); ok {
+		w.filesWidth = min(max(w.filesWidth-dx, 200), 560)
+		w.filesResize = true
+	} else if w.filesResize && !h.Pressed() {
+		w.filesResize = false
 		w.save()
 	}
 	if h.DoubleClicked() {
@@ -1057,25 +1171,76 @@ func (w *Window) filesEnter(tab *Tab, dir string) {
 	}()
 }
 
-// filesPanel is the right sidebar: the folders of the selected terminal.
+// The right sidebar's views.
+const (
+	rightFiles = iota
+	rightGit
+)
+
+// filesPanel is the right sidebar: the folders of the selected terminal,
+// or its Git status.
 func (w *Window) filesPanel(c *ui.Context, lk *look, tab *Tab) {
 	ui.Column(c).Width(w.filesWidth).Shrink(0).Padding(0, 10, 10, 0).Children(func() {
 		w.card(c, lk).Children(func() {
-			ui.Row(c).FillWidth().Height(36).Padding(0, 10).Gap(4).AlignItems(ui.Center).
+			// a narrow sidebar gives its buttons less room between them
+			pad, gap := float32(8), float32(4)
+			if w.filesWidth < 260 {
+				pad, gap = 6, 2
+			}
+			ui.Row(c).FillWidth().Height(36).Padding(0, pad).Gap(gap).AlignItems(ui.Center).
 				BorderWidth(0, 0, 1, 0).BorderColor(lk.divider).Children(func() {
-				ui.Text(c, strings.ToUpper(locales.FilesTitle())).FontSize(11).FontWeight(650).
-					LetterSpacing(0.5).TextColor(lk.textFaint).Grow(1).SingleLine()
-				w.filesFollowChip(c, lk, tab)
-				w.rowButton(c, lk, iconRefresh, locales.FilesRefresh(), func() { w.filesReload(tab) })
+				seg := ui.Segmented(c, &w.rightView, locales.FilesTitle(), locales.SidebarGit()).
+					Height(24).Label(locales.FilesTitle())
+				if seg.Changed() {
+					w.save()
+				}
+				ui.Spacer(c)
+				if w.rightView == rightGit {
+					if b := tab.files; b != nil && b.src != nil && b.path != "" {
+						if gr, ok := b.src.(gitRunner); ok {
+							w.rowButton(c, lk, iconGraph, locales.GitGraph(), func() {
+								w.openGraph(b.src, gr, b.path)
+							})
+						}
+					}
+					w.rowButton(c, lk, iconRefresh, locales.FilesRefresh(), func() { w.gitReload(tab) })
+				} else {
+					w.filesNewButton(c, lk, tab)
+					w.filesFollowChip(c, lk, tab)
+					w.rowButton(c, lk, iconRefresh, locales.FilesRefresh(), func() { w.filesReload(tab) })
+				}
 				w.rowButton(c, lk, iconClose, locales.FilesClose(), w.toggleFiles)
 			})
-			w.filesBody(c, lk, tab)
+			if w.rightView == rightGit {
+				w.gitBody(c, lk, tab)
+			} else {
+				w.filesBody(c, lk, tab)
+			}
 		})
 	})
 }
 
 // filesFollowChip turns following the terminal's directory on and off.
 func (w *Window) filesFollowChip(c *ui.Context, lk *look, tab *Tab) {
+	// a narrow sidebar shows the chip as its icon alone
+	if w.filesWidth < 260 {
+		b := ui.ButtonBase(c).Size(20, 20).Radius(5).Center().Label(locales.FilesFollow())
+		fg := lk.textMuted
+		if w.followDir {
+			fg = lk.accent
+			b.Background(lk.chip)
+		} else if b.Hovered() {
+			b.Background(lk.rowHover)
+		}
+		b.Children(func() {
+			ui.Icon(c, iconTarget).Size(12, 12).TextColor(fg)
+		})
+		b.Tooltip(locales.FilesFollowTip())
+		if b.Clicked() {
+			w.toggleFollow(tab)
+		}
+		return
+	}
 	fg := lk.textMuted
 	b := ui.ButtonBase(c).Height(22).Padding(0, 7).Radius(5).Gap(4).Label(locales.FilesFollow())
 	if w.followDir {
@@ -1090,13 +1255,18 @@ func (w *Window) filesFollowChip(c *ui.Context, lk *look, tab *Tab) {
 	})
 	b.Tooltip(locales.FilesFollowTip())
 	if b.Clicked() {
-		w.followDir = !w.followDir
-		if w.followDir && tab.files != nil {
-			tab.files.lastTermDir = ""
-			tab.files.lastPoll = time.Time{}
-		}
-		w.save()
+		w.toggleFollow(tab)
 	}
+}
+
+// toggleFollow turns following the terminal's directory on and off.
+func (w *Window) toggleFollow(tab *Tab) {
+	w.followDir = !w.followDir
+	if w.followDir && tab.files != nil {
+		tab.files.lastTermDir = ""
+		tab.files.lastPoll = time.Time{}
+	}
+	w.save()
 }
 
 func (w *Window) filesBody(c *ui.Context, lk *look, tab *Tab) {
@@ -1148,7 +1318,15 @@ func (w *Window) filesBody(c *ui.Context, lk *look, tab *Tab) {
 	case len(b.entries) == 0:
 		w.filesMessage(c, lk, locales.FilesEmpty(), "")
 	default:
-		ui.Scroll(c).Fill().Grow(1).Children(func() {
+		ui.Scroll(c).Fill().Grow(1).ContextMenu(func(m *ui.Menu) {
+			w.filesNewItems(m, tab)
+			if m.Item(locales.FilesRefresh()).Chosen() {
+				w.filesReload(tab)
+			}
+			if m.Item(locales.FilesCopyPath()).Chosen() {
+				c.WriteClipboard(b.path)
+			}
+		}).Children(func() {
 			ui.Column(c).FillWidth().Padding(0, 6, 8, 6).Gap(1).Children(func() {
 				for _, entry := range b.entries {
 					entry := entry
@@ -1171,14 +1349,44 @@ func (w *Window) filesMessage(c *ui.Context, lk *look, text, detail string) {
 
 func (w *Window) fileRow(c *ui.Context, lk *look, tab *Tab, entry fileEntry) {
 	b := tab.files
+	full := b.src.Join(b.path, entry.name)
 	row := ui.Row(c).FillWidth().Height(30).Padding(0, 6).Gap(7).Radius(6).AlignItems(ui.Center)
 	if row.Hovered() {
 		row.Background(lk.rowHover)
-		if entry.dir {
-			row.Cursor(ui.CursorPointer)
-		}
+		row.Cursor(ui.CursorPointer)
+	}
+	if w.paneEditor(b.src, full) != nil {
+		row.Background(lk.accentSoft)
 	}
 	row.Tooltip(entry.name)
+	row.ContextMenu(func(m *ui.Menu) {
+		if m.Item(locales.FilesOpen()).Chosen() {
+			if entry.dir {
+				w.filesEnter(tab, full)
+			} else {
+				w.filesOpen(tab, entry)
+			}
+		}
+		if !entry.dir && m.Item(locales.FilesOpenWith()).Chosen() {
+			w.filesOpenExternally(tab, entry)
+		}
+		m.Separator()
+		if filesWriter(tab) != nil {
+			if m.Item(locales.FilesRename()).Chosen() {
+				w.filesRename(tab, entry)
+			}
+			if m.Item(locales.FilesDelete()).Chosen() {
+				w.askDeleteFile(tab, entry)
+			}
+			m.Separator()
+		}
+		if m.Item(locales.FilesCopyPath()).Chosen() {
+			c.WriteClipboard(full)
+		}
+		if m.Item(locales.FilesCopyName()).Chosen() {
+			c.WriteClipboard(entry.name)
+		}
+	})
 	row.Children(func() {
 		fg := lk.textFaint
 		icon := iconFile
@@ -1191,8 +1399,382 @@ func (w *Window) fileRow(c *ui.Context, lk *look, tab *Tab, entry fileEntry) {
 			ui.Text(c, fileSize(entry.size)).FontSize(10.5).TextColor(lk.textFaint).SingleLine()
 		}
 	})
-	if entry.dir && row.Clicked() {
-		w.filesEnter(tab, b.src.Join(b.path, entry.name))
+	if row.DoubleClicked() {
+		if entry.dir {
+			w.filesEnter(tab, full)
+		} else {
+			w.filesOpen(tab, entry)
+		}
+	} else if entry.dir && row.Clicked() {
+		w.filesEnter(tab, full)
+	}
+}
+
+// filesOpen opens a file in the pane's editor, beside the terminal.
+func (w *Window) filesOpen(tab *Tab, entry fileEntry) {
+	b := tab.files
+	if entry.dir || b == nil || b.src == nil {
+		return
+	}
+	w.openFileTab(b.src, b.src.Join(b.path, entry.name), entry.name)
+}
+
+// filesOpenExternally opens a file of the sidebar with the app the system
+// has for it.
+func (w *Window) filesOpenExternally(tab *Tab, entry fileEntry) {
+	b := tab.files
+	if entry.dir || b == nil || b.src == nil {
+		return
+	}
+	if entry.sized && entry.size > openFileMax {
+		w.fileError(locales.FilesTooLarge())
+		return
+	}
+	w.openExternally(b.src, b.src.Join(b.path, entry.name))
+}
+
+// openExternally opens a file with the app the system has for it: where it
+// is when it is this machine's, or a copy of it here for a file on the
+// other side of a network.
+func (w *Window) openExternally(src fileSource, file string) {
+	if local, ok := src.(fileLocal); ok {
+		if p, ok := local.LocalPath(file); ok {
+			w.openFile(p)
+			return
+		}
+	}
+	rd, ok := src.(fileReader)
+	if !ok {
+		return
+	}
+	dir, err := w.openCopyDir()
+	if err != nil {
+		w.fileError(err.Error())
+		return
+	}
+	sub, err := os.MkdirTemp(dir, "open-")
+	if err != nil {
+		w.fileError(err.Error())
+		return
+	}
+	dst := filepath.Join(sub, path.Base(file))
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), fileTimeout)
+		defer cancel()
+		if err := copyFile(ctx, rd, file, dst); err != nil {
+			w.fileError(err.Error())
+			return
+		}
+		w.onMain(func() {
+			if err := mygo.Shell.OpenPath(dst); err != nil {
+				w.errMsg, w.errOpen = err.Error(), true
+			}
+		})
+	}()
+}
+
+// openFile opens a file of this machine with the app the system has for
+// it, without holding up the frame.
+func (w *Window) openFile(file string) {
+	go func() {
+		if err := mygo.Shell.OpenPath(file); err != nil {
+			w.fileError(err.Error())
+		}
+	}()
+}
+
+// openCopyDir is the folder copies of remote files open in, made on first
+// use, and emptied when the window closes.
+func (w *Window) openCopyDir() (string, error) {
+	if w.openTemp == "" {
+		dir, err := os.MkdirTemp("", "goshell-open-*")
+		if err != nil {
+			return "", err
+		}
+		w.openTemp = dir
+	}
+	return w.openTemp, nil
+}
+
+// copyFile writes what a file on the other side of a network holds to dst
+// here, up to the most the sidebar copies.
+func copyFile(ctx context.Context, rd fileReader, file, dst string) error {
+	rc, err := rd.Reader(ctx, file)
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+	data, err := readLimited(rc)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, data, 0o600)
+}
+
+// fileError shows what went wrong with a file, in a dialog.
+func (w *Window) fileError(text string) {
+	w.onMain(func() {
+		w.errMsg, w.errOpen = text, true
+	})
+}
+
+// filesWriter returns the session's file source when it can change files,
+// or nil when the sidebar only browses them.
+func filesWriter(tab *Tab) fileWriter {
+	if tab == nil || tab.files == nil || tab.files.src == nil {
+		return nil
+	}
+	wr, _ := tab.files.src.(fileWriter)
+	return wr
+}
+
+// filesNewButton opens the menu that makes a file or a folder in the
+// folder the sidebar shows.
+func (w *Window) filesNewButton(c *ui.Context, lk *look, tab *Tab) {
+	if filesWriter(tab) == nil {
+		return
+	}
+	b := ui.ButtonBase(c).Size(20, 20).Radius(5).Center().Label(locales.FilesNew())
+	if b.Hovered() {
+		b.Background(lk.chip)
+	}
+	b.PopoverMenuButton(func(m *ui.Menu) { w.filesNewItems(m, tab) })
+	b.Children(func() {
+		ui.Icon(c, iconPlus).Size(12, 12).TextColor(lk.textMuted)
+	})
+	b.Tooltip(locales.FilesNew())
+}
+
+// filesNewItems adds making a folder and a file to m.
+func (w *Window) filesNewItems(m *ui.Menu, tab *Tab) {
+	if filesWriter(tab) == nil {
+		return
+	}
+	if m.Item(locales.FilesNewFolder()).Chosen() {
+		w.filesNew(tab, true)
+	}
+	if m.Item(locales.FilesNewFile()).Chosen() {
+		w.filesNew(tab, false)
+	}
+}
+
+// filesNew asks for the name of a file or folder to make in the folder the
+// sidebar shows.
+func (w *Window) filesNew(tab *Tab, dir bool) {
+	b := tab.files
+	wr := filesWriter(tab)
+	if b == nil || wr == nil {
+		return
+	}
+	parent := b.path
+	title := locales.FilesNewFileTitle()
+	if dir {
+		title = locales.FilesNewFolderTitle()
+	}
+	w.filePrompt = &filePrompt{
+		title: title,
+		label: locales.FilesName(),
+		ok: func(name string) error {
+			ctx, cancel := context.WithTimeout(context.Background(), fileTimeout)
+			defer cancel()
+			target := b.src.Join(parent, name)
+			if dir {
+				return wr.Mkdir(ctx, target)
+			}
+			return wr.Touch(ctx, target)
+		},
+		done: func() { w.filesReloadHere(tab, b, parent) },
+	}
+}
+
+// filesRename asks for a new name for a file or folder.
+func (w *Window) filesRename(tab *Tab, entry fileEntry) {
+	b := tab.files
+	wr := filesWriter(tab)
+	if b == nil || wr == nil {
+		return
+	}
+	dir, from := b.path, b.src.Join(b.path, entry.name)
+	w.filePrompt = &filePrompt{
+		title: locales.FilesRenameTitle(entry.name),
+		label: locales.FilesName(),
+		value: entry.name,
+		ok: func(name string) error {
+			if name == entry.name {
+				return nil
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), fileTimeout)
+			defer cancel()
+			return wr.Rename(ctx, from, b.src.Join(dir, name))
+		},
+		done: func() { w.filesReloadHere(tab, b, dir) },
+	}
+}
+
+// askDeleteFile asks before a file or folder goes away.
+func (w *Window) askDeleteFile(tab *Tab, entry fileEntry) {
+	if filesWriter(tab) == nil || tab.files == nil {
+		return
+	}
+	b := tab.files
+	w.delTitle = locales.FilesDeleteTitle(entry.name)
+	w.delMsg = locales.FilesDeleteMsg()
+	w.delFn = func() { w.deleteFile(tab, b, entry) }
+	w.delOpen = true
+}
+
+// deleteFile removes a file or folder, a folder with what it holds.
+func (w *Window) deleteFile(tab *Tab, b *fileBrowser, entry fileEntry) {
+	wr := filesWriter(tab)
+	if wr == nil {
+		return
+	}
+	dir, target := b.path, b.src.Join(b.path, entry.name)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), fileTimeout)
+		defer cancel()
+		err := wr.Remove(ctx, target, entry.dir)
+		w.onMain(func() {
+			if err != nil {
+				w.errMsg, w.errOpen = err.Error(), true
+				return
+			}
+			w.filesReloadHere(tab, b, dir)
+		})
+	}()
+}
+
+// filesReloadHere lists a folder again when the sidebar still shows it, as
+// after a change there.
+func (w *Window) filesReloadHere(tab *Tab, b *fileBrowser, dir string) {
+	if tab.files == b && b.path == dir {
+		w.filesReload(tab)
+	}
+	if tab.git != nil && tab.git.dir == dir {
+		w.gitReload(tab)
+	}
+}
+
+// confirmDialog is a question with two answers: the second runs fn.
+type confirmDialog struct {
+	title   string
+	message string
+	ok      string
+	fn      func()
+}
+
+// confirmDialog draws a question, and runs its answer once chosen.
+func (w *Window) confirmDialog(c *ui.Context) {
+	p := w.confirm
+	if p == nil {
+		return
+	}
+	open := true
+	switch ui.AlertDialog(c, &open, p.title, p.message, locales.BtnCancel(), p.ok) {
+	case 1:
+		w.confirm = nil
+		p.fn()
+		return
+	}
+	if !open {
+		w.confirm = nil
+	}
+}
+
+// filePrompt is the dialog that names a file or folder: ok changes the
+// files, and done runs after it did, on the window's thread.
+type filePrompt struct {
+	title string
+	label string
+	value string
+	err   string
+	busy  bool
+	ok    func(name string) error
+	done  func()
+}
+
+// validFileName reports whether name can be a file or folder's name.
+func validFileName(name string) bool {
+	return name != "" && name != "." && name != ".." && !strings.ContainsAny(name, "/\\")
+}
+
+// submitFilePrompt makes or renames the file or folder the dialog names,
+// and shows what went wrong where it did.
+func (w *Window) submitFilePrompt() {
+	p := w.filePrompt
+	if p == nil || p.busy {
+		return
+	}
+	name := strings.TrimSpace(p.value)
+	if !validFileName(name) {
+		p.err = locales.FilesNameInvalid()
+		return
+	}
+	p.err, p.busy = "", true
+	op, done := p.ok, p.done
+	go func() {
+		err := op(name)
+		w.onMain(func() {
+			p.busy = false
+			if err != nil {
+				p.err = err.Error()
+				return
+			}
+			if w.filePrompt == p {
+				w.filePrompt = nil
+			}
+			if done != nil {
+				done()
+			}
+		})
+	}()
+}
+
+// filePromptDialog draws the dialog that names a file or folder.
+func (w *Window) filePromptDialog(c *ui.Context) {
+	p := w.filePrompt
+	if p == nil {
+		return
+	}
+	lk := lookFor(c)
+	open := true
+	ui.Modal(c, &open, func() {
+		ui.Column(c).Width(420).Padding(20).Gap(14).Children(func() {
+			dialogHeading(c, p.title)
+			submitted := false
+			ui.Form(c, func() {
+				ui.Field(c, p.label, func() {
+					in := ui.TextInput(c, &p.value).AutoFocus()
+					if p.busy {
+						in.ReadOnly(true)
+					}
+					submitted = in.Submitted()
+				})
+			})
+			if p.err != "" {
+				ui.Text(c, p.err).FontSize(12.5).TextColor(lk.danger).LineHeight(1.35)
+			}
+			ui.Row(c).Gap(8).Children(func() {
+				ui.Spacer(c)
+				cancel := ui.Button(c, locales.BtnCancel())
+				if p.busy {
+					cancel.Disabled(true)
+				}
+				if cancel.Clicked() {
+					open = false
+				}
+				ok := ui.PrimaryButton(c, locales.BtnOK())
+				if p.busy {
+					ok.Disabled(true)
+				}
+				if ok.Clicked() || submitted {
+					w.submitFilePrompt()
+				}
+			})
+		})
+	})
+	if !open {
+		w.filePrompt = nil
 	}
 }
 
@@ -1360,6 +1942,10 @@ func (w *Window) closeSelected() {
 // menu's Find does.
 func (w *Window) toggleFind() {
 	w.onMain(func() {
+		// a focused editor finds its own text; the terminal finds its own
+		if w.editorFind() {
+			return
+		}
 		if w.selectedTab() == nil {
 			return
 		}
@@ -1474,28 +2060,26 @@ func (w *Window) findBar(c *ui.Context, lk *look, tab *Tab) {
 		}
 	}
 
-	ui.Row(c).Height(26).Shrink(0).Gap(4).AlignItems(ui.Center).Padding(0, 6).Radius(6).
-		Background(lk.chip).Children(func() {
-		if ui.SearchField(c, &w.findQuery).Width(160).Height(24).Changed() {
-			if w.findQuery != w.findLastQuery {
-				w.findLastQuery = w.findQuery
-				w.findTotal, w.findSel, w.findSearching = 0, 0, true
-				term.Search(w.findQuery)
-			}
+	ui.Spacer(c)
+	if ui.SearchField(c, &w.findQuery).Width(240).Height(24).Changed() {
+		if w.findQuery != w.findLastQuery {
+			w.findLastQuery = w.findQuery
+			w.findTotal, w.findSel, w.findSearching = 0, 0, true
+			term.Search(w.findQuery)
 		}
-		switch {
-		case w.findQuery == "":
-		case w.findSearching:
-			ui.Text(c, locales.FindSearching()).FontSize(11.5).TextColor(lk.textMuted).SingleLine()
-		case w.findTotal == 0:
-			ui.Text(c, locales.FindNoMatches()).FontSize(11.5).TextColor(lk.textMuted).SingleLine()
-		default:
-			ui.Textf(c, "%s", locales.FindOf(w.findSel, w.findTotal)).FontSize(11.5).TextColor(lk.textMuted).SingleLine()
-		}
-		w.rowButton(c, lk, iconChevronUp, locales.TooltipPrevMatch(), term.SearchPrevious)
-		w.rowButton(c, lk, iconChevronDown, locales.TooltipNextMatch(), term.SearchNext)
-		w.rowButton(c, lk, iconClose, locales.TooltipCloseFind(), func() { w.findOpen = false })
-	})
+	}
+	switch {
+	case w.findQuery == "":
+	case w.findSearching:
+		ui.Text(c, locales.FindSearching()).FontSize(11.5).TextColor(lk.textMuted).SingleLine()
+	case w.findTotal == 0:
+		ui.Text(c, locales.FindNoMatches()).FontSize(11.5).TextColor(lk.textMuted).SingleLine()
+	default:
+		ui.Textf(c, "%s", locales.FindOf(w.findSel, w.findTotal)).FontSize(11.5).TextColor(lk.textMuted).SingleLine()
+	}
+	w.rowButton(c, lk, iconChevronUp, locales.TooltipPrevMatch(), term.SearchPrevious)
+	w.rowButton(c, lk, iconChevronDown, locales.TooltipNextMatch(), term.SearchNext)
+	w.rowButton(c, lk, iconClose, locales.TooltipCloseFind(), func() { w.findOpen = false })
 }
 
 // stopFind closes the find bar and ends its search.
@@ -1648,6 +2232,8 @@ func (w *Window) dialogs(c *ui.Context) {
 			w.delFn()
 		}
 	}
+	w.filePromptDialog(c)
+	w.confirmDialog(c)
 	w.colorThemeDialog(c)
 	w.themeDialog(c)
 	w.configDialog(c)

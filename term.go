@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/egoist/mygo/plugins/terminal"
 	"github.com/egoist/mygo/ui"
 	"goshell/locales"
@@ -15,6 +17,7 @@ type Tab struct {
 	closer func()         // closes the connection the terminal is fed with
 	status *programStatus // the program's OSC 7501 reports
 	files  *fileBrowser   // the right sidebar's folder
+	git    *gitView       // the right sidebar's Git view
 }
 
 func (t *Tab) Name() string {
@@ -47,6 +50,9 @@ func (w *Window) newTab(name string, cfg Config, closer func(), opts terminal.Op
 		w.showToast(locales.ToastSessionEnded(name), "")
 		w.removeTab(tab)
 	}
+	// a Command+click on a URL shows the page beside the terminal, and
+	// one on a file path opens the file there
+	opts.OpenLink = func(link string) bool { return w.openLink(tab, link) }
 	opts.OnSearch = func(s terminal.SearchStatus) {
 		w.onMain(func() {
 			if w.selectedTab() != tab {
@@ -80,6 +86,7 @@ func (w *Window) newTab(name string, cfg Config, closer func(), opts terminal.Op
 func (w *Window) addTermTab(tab *Tab) {
 	w.tabs = append(w.tabs, tab)
 	w.selected = len(w.tabs) - 1
+	w.syncMenus()
 }
 
 func (w *Window) selectedTab() *Tab {
@@ -115,6 +122,7 @@ func (w *Window) removeTab(tab *Tab) {
 				break
 			}
 		}
+		w.syncMenus()
 	})
 }
 
@@ -123,4 +131,10 @@ func (w *Window) closeAll() {
 	for _, tab := range tabs {
 		w.removeTab(tab)
 	}
+	// the copies of remote files opened here go with the window
+	if w.openTemp != "" {
+		os.RemoveAll(w.openTemp)
+		w.openTemp = ""
+	}
+	w.closePanes()
 }

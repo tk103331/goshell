@@ -16,8 +16,30 @@ remembers the hosts in a sidebar.
   Docker and Kubernetes apart. Click a host to fold or unfold its sessions;
   the `+` starts new ones.
 - A search field in the sidebar that filters hosts and sessions.
+- A split middle area: the terminal, and beside it a pane of tabs for files
+  and web pages. Double-click a file to open it as what it is: Markdown
+  rendered, with a switch to its source; a picture in a preview; any other
+  text in the built-in code editor, with syntax highlighting, find and
+  replace, line wrapping a button turns on and off, and Save back to the
+  local disk, the SSH server, the container or the pod. The row's menu opens
+  a file with the system's app instead.
+- Command+click (Control+click elsewhere) a URL the terminal shows to open
+  it in a web view in that pane, with back, forward, reload and open in the
+  system's browser; a file path a command printed opens in the editor.
 - A right sidebar of files for local, SSH, Docker and Kubernetes sessions,
-  with a Follow toggle for the shell's current directory.
+  with a Follow toggle for the shell's current directory and actions to
+  make files and folders, rename them, delete them and copy their paths.
+- Its Git view splits into the changes, with a box to write and make a
+  commit of the files checked in the list, a + on an untracked file that
+  adds it to Git, and the branch's commits; a double click opens a file's
+  changes
+  in MyGo's diff viewer, and the graph button opens the commits in lanes
+  with their branches and tags. A commit, there or in the graph, is chosen
+  by a click and opens its message with the diffs of every file it changed
+  on a double click. The branch row switches branches, and searches them;
+  the commits and the graph filter by subject, author or hash, or by
+  author:, msg: and hash:. It works for this machine, an SSH server, a
+  container or a pod.
 - Docker container picker with search, images, states and one-click
   connection.
 - Kubernetes picker with searchable namespace, pod and container fields, and
@@ -33,8 +55,8 @@ remembers the hosts in a sidebar.
 - Finds a local Docker daemon and adds a config for it on first launch.
 - Program status (OSC 7501): session row icons show what long-running
   programs are doing; hover for the message.
-- Find in the title bar, and a download reminder in it when an update is
-  available.
+- Find in the terminal's title bar, and a download reminder at the foot of
+  the sidebar when an update is available.
 - Signed automatic updates from GitHub releases, with Help > Check for
   Updates…
 
@@ -87,11 +109,11 @@ told apart by their icons and colors. The sessions open on a host are its
 children in the sidebar. Click a host to fold or unfold them; the `+` shown
 on hover starts a new session on that host.
 
-The `+` beside the sidebar button opens the new-session popover: `LOCAL`
+The `+` at the top of the session list opens the new-session popover: `LOCAL`
 first, then each host with its address and open-session count, and a New Host
 action at the end. With no saved hosts, it starts `LOCAL` directly. There are
-no tabs above the terminal: the title bar names the session on top, and its
-host is lit in the sidebar.
+no tabs above the terminal: the terminal's own title bar names the session,
+and its host is lit in the sidebar.
 
 SSH connects to the host. Docker and Kubernetes open a picker first:
 
@@ -162,8 +184,9 @@ rsync -a ~/Photos backup:/photos && status done "Photos synced" || status error 
 The foot of the host sidebar has a palette button that opens the color themes
 with a preview of each, a moon or sun button that switches between the light
 and the dark appearance, a `中文`/`EN` button that switches the language, and
-About. The title bar holds Find, the file sidebar toggle and,
-when there is one, an update reminder; New Command is in the File menu. The View menu has the same choices, with
+About. The terminal's title bar holds the sidebars' buttons, the session's
+name and Find; an update reminder sits at the foot of the sidebar; New
+Command is in the File menu. The View menu has the same choices, with
 "System" to follow the desktop's appearance and languages.
 
 View > Terminal Theme… chooses one of the themes Ghostty ships, or returns
@@ -183,8 +206,8 @@ Packaged builds check the [latest GitHub release](https://github.com/tk103331/go
 for updates in the background, and Help > Check for Updates… asks right away.
 The native update window shows the version and notes, then downloads, verifies
 and installs the signed update and offers to relaunch. Help > About shows the
-running version; when a check finds a newer one, a download chip appears in
-the title bar as well.
+running version; when a check finds a newer one, a download chip appears at
+the foot of the sidebar as well.
 
 The update files are signed with the Ed25519 key whose public half is in
 `mygo.json` (`updates.publicKey`). `mygo build` reads the private half from

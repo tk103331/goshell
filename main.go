@@ -140,6 +140,16 @@ func setMenus(w *Window) {
 		}},
 	}
 
+	saveItem := &mygo.MenuItem{
+		Label:       locales.MenuSaveFile(),
+		Accelerator: "CmdOrCtrl+S",
+		Disabled:    true,
+		Click: func(*mygo.MenuItem, *mygo.Window) {
+			w.saveEditor()
+		},
+	}
+	w.menuSave = saveItem
+
 	menu := mygo.NewMenu([]*mygo.MenuItem{
 		{Role: mygo.RoleAppMenu},
 		{Label: locales.MenuFile(), Submenu: []*mygo.MenuItem{
@@ -153,6 +163,7 @@ func setMenus(w *Window) {
 				w.openNewCmd()
 			}},
 			mygo.Separator(),
+			saveItem,
 			{Label: locales.MenuCloseTab(), Accelerator: "CmdOrCtrl+W", Click: func(*mygo.MenuItem, *mygo.Window) {
 				w.closeSelected()
 			}},
@@ -169,4 +180,5 @@ func setMenus(w *Window) {
 	})
 	mygo.App.SetMenu(menu)
 	w.win.SetMenu(menu)
+	w.syncMenus()
 }

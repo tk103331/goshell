@@ -218,6 +218,7 @@ type appFile struct {
 	SidebarWidth  float32           `json:"sidebarWidth,omitempty"`
 	FilesHidden   bool              `json:"filesHidden,omitempty"`
 	FilesWidth    float32           `json:"filesWidth,omitempty"`
+	RightView     int               `json:"rightView,omitempty"`
 	FollowDir     *bool             `json:"followDir,omitempty"`
 	DockerDefault bool              `json:"dockerDefault,omitempty"`
 }
@@ -277,6 +278,10 @@ func (w *Window) load() error {
 	if f.SidebarWidth > 0 {
 		w.sidebar = min(max(f.SidebarWidth, 200), 520)
 	}
+	w.rightView = f.RightView
+	if w.rightView != rightGit {
+		w.rightView = rightFiles
+	}
 	w.showFiles = !f.FilesHidden
 	if f.FilesWidth > 0 {
 		w.filesWidth = min(max(f.FilesWidth, 200), 560)
@@ -299,11 +304,18 @@ func (w *Window) save() {
 	if w.path == "" {
 		return
 	}
+	followDir := w.followDir
 	f := appFile{
 		Commands:      w.cmds,
 		Appearance:    w.appTheme,
+		ColorTheme:    w.colorTheme,
 		TerminalTheme: w.termThemeName,
 		SidebarHidden: !w.showSidebar,
+		SidebarWidth:  w.sidebar,
+		FilesHidden:   !w.showFiles,
+		FilesWidth:    w.filesWidth,
+		RightView:     w.rightView,
+		FollowDir:     &followDir,
 		DockerDefault: w.dockerDefaultAdded,
 	}
 	for _, conf := range w.confs {
