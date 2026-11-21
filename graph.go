@@ -461,18 +461,14 @@ func (w *Window) gitRefChip(c *ui.Context, lk *look, ref string) {
 }
 
 // refLabel shortens a ref as a chip says it: a tag without its prefix, and
-// a remote's branch without its name.
+// HEAD as the branch it is on. A remote keeps its name, which tells it from
+// the branch of the same name here.
 func refLabel(ref string) string {
 	switch {
 	case strings.HasPrefix(ref, "HEAD -> "):
 		return strings.TrimPrefix(ref, "HEAD -> ")
 	case strings.HasPrefix(ref, "tag: "):
 		return strings.TrimPrefix(ref, "tag: ")
-	}
-	for _, remote := range []string{"origin/", "upstream/"} {
-		if rest, ok := strings.CutPrefix(ref, remote); ok {
-			return rest
-		}
 	}
 	return ref
 }

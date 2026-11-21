@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- A remote branch's chip keeps its remote in its name, as `origin/main`, so
+  it reads apart from the local branch of the same name.
+
 ## [0.5.0] - 2026-11-20
 
 ### Added

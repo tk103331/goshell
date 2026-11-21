@@ -354,7 +354,7 @@ func TestGraphRefs(t *testing.T) {
 	if got := refLabel("tag: v1.0.0"); got != "v1.0.0" {
 		t.Fatalf("a tag is %q", got)
 	}
-	if got := refLabel("origin/feature/x"); got != "feature/x" {
+	if got := refLabel("origin/feature/x"); got != "origin/feature/x" {
 		t.Fatalf("a remote branch is %q", got)
 	}
 	if got := refLabel("release/1.0"); got != "release/1.0" {
