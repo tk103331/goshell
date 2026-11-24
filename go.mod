@@ -5,7 +5,7 @@ go 1.27.3
 require (
 	github.com/docker/docker v28.5.1+incompatible
 	github.com/ebitengine/purego v0.11.3
-	github.com/egoist/mygo v0.9.0
+	github.com/egoist/mygo v0.10.0
 	github.com/pkg/sftp v1.13.12
 	github.com/tk103331/stream v1.0.2
 	golang.org/x/crypto v0.59.0
