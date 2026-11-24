@@ -1,11 +1,13 @@
 # Changelog
 
-## [Unreleased]
+## [0.6.0] - 2026-11-25
 
 ### Changed
 
 - A remote branch's chip keeps its remote in its name, as `origin/main`, so
   it reads apart from the local branch of the same name.
+- The app is built on MyGo 0.10.0, with the latest purego and SFTP
+  libraries.
 
 ## [0.5.0] - 2026-11-20
 
