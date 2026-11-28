@@ -16,8 +16,10 @@ import (
 // libghostty-vt keeps unknown OSC sequences for the embedder, and mygo's
 // terminal does not expose that callback yet. The bridge below reaches the
 // terminal's handle and the library's own options, which are ABI-stable:
-// it makes OSC 7501 work in every terminal, local or remote, until mygo
-// grows the hook itself. Every failure leaves the rest of the app alone.
+// it makes the reports of the Program Status Protocol (OSC 7501) and of the
+// Program Resume Protocol (OSC 7577) work in every terminal, local or
+// remote, until mygo grows the hook itself. Every failure leaves the rest
+// of the app alone.
 
 // statusABI is the part of libghostty-vt's ghostty_type_json that the
 // bridge reads: option numbers and the offsets of the unknown-sequence
@@ -84,16 +86,34 @@ func attachProgramStatus(tab *Tab) {
 	statusState.terms[handle] = tab.status
 	statusState.mu.Unlock()
 
-	if !statusSetPtr(handle, statusState.layout.optMax, unsafe.Pointer(&maxStatusBytes)) {
+	if !enableUnknownSequences(handle) {
 		return
 	}
-	statusSet(handle, statusState.layout.optUnknown, statusState.unknownCB)
 	if statusState.layout.optPrompt != 0 {
 		statusSet(handle, statusState.layout.optPrompt, statusState.promptCB)
 	}
 	if statusState.layout.optReset != 0 {
 		statusSet(handle, statusState.layout.optReset, statusState.resetCB)
 	}
+}
+
+// enableUnknownSequences gives a terminal the library's callback for the
+// sequences it does not know, which the reports of the Program Status
+// Protocol and of the Program Resume Protocol come through. It reports
+// false when the library cannot say what it holds.
+func enableUnknownSequences(handle uintptr) bool {
+	if handle == 0 {
+		return false
+	}
+	statusState.once.Do(initProgramStatusBridge)
+	if statusState.err != nil {
+		return false
+	}
+	if !statusSetPtr(handle, statusState.layout.optMax, unsafe.Pointer(&maxStatusBytes)) {
+		return false
+	}
+	statusSet(handle, statusState.layout.optUnknown, statusState.unknownCB)
+	return true
 }
 
 // detachProgramStatus forgets a terminal being closed.
@@ -249,14 +269,14 @@ func hasField(fields map[string]statusABIField, name string) bool {
 }
 
 // onUnknownSequence gets every OSC and APC the library does not implement;
-// only OSC 7501 reports are taken.
+// only the reports of the Program Status Protocol (OSC 7501) and of the
+// Program Resume Protocol (OSC 7577) are taken.
 func onUnknownSequence(term, _ unsafe.Pointer, seq unsafe.Pointer) {
 	defer func() {
 		// a malformed report must not take the terminal down
 		_ = recover()
 	}()
-	status := statusOf(uintptr(term))
-	if status == nil || seq == nil {
+	if seq == nil {
 		return
 	}
 	l := statusState.layout
@@ -272,6 +292,16 @@ func onUnknownSequence(term, _ unsafe.Pointer, seq unsafe.Pointer) {
 		return
 	}
 	content := string(unsafe.Slice((*byte)(ptr), n))
+	// The Program Resume Protocol, OSC 7577, which the library does not
+	// know either.
+	if body, ok := strings.CutPrefix(content, "7577;"); ok {
+		resumeHandle(uintptr(term), body)
+		return
+	}
+	status := statusOf(uintptr(term))
+	if status == nil {
+		return
+	}
 	body, ok := strings.CutPrefix(content, "7501;")
 	if !ok {
 		return

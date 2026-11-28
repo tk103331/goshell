@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- The app speaks the Program Resume Protocol (OSC 7577): a local program
+  that reports the command and directory that bring it back is listed in
+  File > Resume Programs… once its process is gone, with a button for each
+  and Resume All, and the records outlive a restart. Reports are checked
+  against a token the app gives each terminal, and only local sessions get
+  one.
+
 ## [0.6.0] - 2026-11-25
 
 ### Changed

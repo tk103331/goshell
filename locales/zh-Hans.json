@@ -239,5 +239,14 @@
   "aboutBody": "GoShell 是一个用 Go 编写、基于 MyGo 的简易终端图形客户端，支持 SSH、Docker 和 K8S。",
   "aboutVersion": "版本 {version}",
   "aboutUpdateCheck": "检查更新…",
-  "updateAvailable": "新版本 {version} 可用"
+  "updateAvailable": "新版本 {version} 可用",
+
+  "menuResumePrograms": "恢复程序…",
+  "resumeTitle": "恢复程序",
+  "resumeHint": "这些程序告诉 GoShell 如何把它们带回来。",
+  "resumeNone": "没有可以带回来的程序。",
+  "resumeAll": "全部恢复",
+  "resumeBtn": "恢复",
+  "resumeNoDir": "文件夹 {dir} 已不存在。",
+  "resumeNotFound": "PATH 中没有 {name}。"
 }

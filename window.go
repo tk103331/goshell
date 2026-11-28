@@ -116,6 +116,12 @@ type Window struct {
 	gitShare  float32 // the Git view's share for the changes
 	diffSplit bool    // the diffs show side by side, not one over the other
 
+	// the Program Resume Protocol: the records of the programs that can
+	// be brought back, and the dialog that offers them
+	resume        *resumeStore
+	resumeOpen    bool
+	resumeRecords []*resumeRecord
+
 	docker *dockerDialog
 	k8s    *k8sDialog
 }
@@ -715,7 +721,7 @@ func (w *Window) sessionRow(c *ui.Context, lk *look, index int, tab *Tab) {
 	row.Tooltip(tip)
 	row.ContextMenu(func(m *ui.Menu) {
 		if m.Item(locales.TooltipCloseTab()).Chosen() {
-			w.removeTab(tab)
+			w.closeTab(tab)
 		}
 	}).Children(func() {
 		ui.Box(c).Size(24, 24).Center().Children(func() {
@@ -731,7 +737,7 @@ func (w *Window) sessionRow(c *ui.Context, lk *look, index int, tab *Tab) {
 		}
 		ui.Text(c, tab.Name()).FontSize(12.2).TextColor(fg).Grow(1).SingleLine().Ellipsis("…")
 		if hovered || selected {
-			w.rowButton(c, lk, iconClose, locales.TooltipCloseTab(), func() { w.removeTab(tab) })
+			w.rowButton(c, lk, iconClose, locales.TooltipCloseTab(), func() { w.closeTab(tab) })
 		}
 	})
 	if row.Clicked() {
@@ -1934,7 +1940,7 @@ func (w *Window) askDeleteCmd(cmd *Cmd) {
 // closeSelected closes the tab the window shows, as the menu's Close Tab does.
 func (w *Window) closeSelected() {
 	if tab := w.selectedTab(); tab != nil {
-		w.removeTab(tab)
+		w.closeTab(tab)
 	}
 }
 
@@ -2234,6 +2240,7 @@ func (w *Window) dialogs(c *ui.Context) {
 	}
 	w.filePromptDialog(c)
 	w.confirmDialog(c)
+	w.resumeDialog(c)
 	w.colorThemeDialog(c)
 	w.themeDialog(c)
 	w.configDialog(c)

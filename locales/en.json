@@ -245,5 +245,14 @@
   "aboutBody": "GoShell is a simple terminal GUI client, written in Go, via MyGo. Supports SSH, Docker and K8S.",
   "aboutVersion": "Version {version}",
   "aboutUpdateCheck": "Check for Updates…",
-  "updateAvailable": "Version {version} is available"
+  "updateAvailable": "Version {version} is available",
+
+  "menuResumePrograms": "Resume Programs…",
+  "resumeTitle": "Resume Programs",
+  "resumeHint": "These programs told GoShell how to bring them back.",
+  "resumeNone": "There is nothing to bring back.",
+  "resumeAll": "Resume All",
+  "resumeBtn": "Resume",
+  "resumeNoDir": "The folder {dir} is gone.",
+  "resumeNotFound": "{name} is not on PATH."
 }

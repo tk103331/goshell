@@ -230,6 +230,11 @@ func (w *Window) load() error {
 	}
 	w.path = filepath.Join(dir, "goshell.json")
 
+	// the records of the programs that can be brought back, which the last
+	// run left in the app's data directory
+	w.resume = openResumeStore(filepath.Join(dir, "resume.json"))
+	w.resume.changed = w.invalidate
+
 	data, err := os.ReadFile(w.path)
 	if err != nil {
 		if os.IsNotExist(err) {

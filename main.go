@@ -64,6 +64,10 @@ func main() {
 		w.detectLocalDocker()
 
 		w.openLocal()
+
+		// the programs that can be brought back, which the last run left
+		// behind
+		w.checkResume()
 	})
 	if err := mygo.App.Run(); err != nil {
 		log.Fatal(err)
@@ -155,6 +159,9 @@ func setMenus(w *Window) {
 		{Label: locales.MenuFile(), Submenu: []*mygo.MenuItem{
 			{Label: locales.MenuNewShell(), Accelerator: "CmdOrCtrl+T", Click: func(*mygo.MenuItem, *mygo.Window) {
 				w.openLocal()
+			}},
+			{Label: locales.MenuResumePrograms(), Click: func(*mygo.MenuItem, *mygo.Window) {
+				w.openResume()
 			}},
 			{Label: locales.MenuNewConfig(), Accelerator: "CmdOrCtrl+N", Click: func(*mygo.MenuItem, *mygo.Window) {
 				w.openCreate()

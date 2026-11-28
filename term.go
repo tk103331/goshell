@@ -14,10 +14,11 @@ type Tab struct {
 	title  string // the title the program set, if any
 	term   *terminal.Terminal
 	cfg    Config
-	closer func()         // closes the connection the terminal is fed with
-	status *programStatus // the program's OSC 7501 reports
-	files  *fileBrowser   // the right sidebar's folder
-	git    *gitView       // the right sidebar's Git view
+	closer func()          // closes the connection the terminal is fed with
+	status *programStatus  // the program's OSC 7501 reports
+	files  *fileBrowser    // the right sidebar's folder
+	git    *gitView        // the right sidebar's Git view
+	resume *resumeTerminal // what the terminal knows of the OSC 7577 reports
 }
 
 func (t *Tab) Name() string {
@@ -31,6 +32,16 @@ func (t *Tab) Name() string {
 // window with addTermTab once its connection is set up.
 func (w *Window) newTab(name string, cfg Config, closer func(), opts terminal.Options) (*Tab, *terminal.Terminal, error) {
 	tab := &Tab{name: name, cfg: cfg, closer: closer}
+	// The Program Resume Protocol: every terminal has a token of its own,
+	// in the environment of the first process on its pseudo-terminal, so
+	// that the programs running there can tell the terminal how to bring
+	// them back. A remote session has no token: the token must not leave
+	// the machine.
+	token := ""
+	if opts.Conn == nil {
+		token = newResumeToken()
+		opts.Env = append(opts.Env, resumeTokenEnv+"="+token)
+	}
 	// Typing in a terminal is seeing what it finished: drop done and
 	// error records, as the protocol says.
 	previousKey := opts.OnKey
@@ -76,6 +87,7 @@ func (w *Window) newTab(name string, cfg Config, closer func(), opts terminal.Op
 	if err == nil {
 		tab.status = newProgramStatus(term, w.invalidate)
 		attachProgramStatus(tab)
+		attachResume(tab, token, w.resume)
 		if cfg == nil {
 			tab.useFiles(localFiles{})
 		}
@@ -97,9 +109,25 @@ func (w *Window) selectedTab() *Tab {
 }
 
 // removeTab closes the tab's terminal and its connection, and takes the tab
-// out of the window.
+// out of the window. The records of the programs that reported to the
+// terminal stay: the terminal ended, and the protocol says a terminal keeps
+// them when it ends for any reason but the user closing it.
 func (w *Window) removeTab(tab *Tab) {
+	w.removeTabRecords(tab, false)
+}
+
+// closeTab takes the tab out of the window, as the user closing it does:
+// the records of the programs that reported to the terminal go, for the
+// protocol says a terminal drops them when the user closes it on purpose.
+func (w *Window) closeTab(tab *Tab) {
+	w.removeTabRecords(tab, true)
+}
+
+// removeTabRecords takes the tab out of the window, and drops the records
+// of the programs that reported to its terminal when discard is true.
+func (w *Window) removeTabRecords(tab *Tab, discard bool) {
 	detachProgramStatus(tab)
+	detachResume(tab, discard)
 	if tab.files != nil && tab.files.src != nil {
 		tab.files.src.Close()
 	}
@@ -130,6 +158,11 @@ func (w *Window) closeAll() {
 	tabs := append([]*Tab(nil), w.tabs...)
 	for _, tab := range tabs {
 		w.removeTab(tab)
+	}
+	// the records of the programs that can be brought back are written
+	// down, as the app goes
+	if w.resume != nil {
+		w.resume.flush()
 	}
 	// the copies of remote files opened here go with the window
 	if w.openTemp != "" {

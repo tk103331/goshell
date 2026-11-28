@@ -55,6 +55,8 @@ remembers the hosts in a sidebar.
 - Finds a local Docker daemon and adds a config for it on first launch.
 - Program status (OSC 7501): session row icons show what long-running
   programs are doing; hover for the message.
+- Program resume (OSC 7577): a program that is gone comes back with the
+  command it asked for, from File > Resume Programs….
 - Find in the terminal's title bar, and a download reminder at the foot of
   the sidebar when an update is available.
 - Signed automatic updates from GitHub releases, with Help > Check for
@@ -178,6 +180,24 @@ status() {
 status working "Syncing photos"
 rsync -a ~/Photos backup:/photos && status done "Photos synced" || status error "rsync failed"
 ```
+
+# Program resume
+
+GoShell speaks the [Program Resume Protocol](https://www.superlogical.com/rex/docs/build/program-resume)
+(OSC 7577). A local terminal gives the first process on its pseudo-terminal
+a token in `OSC7577_TOKEN`, and a program that finds it can report the
+command and the directory that bring it back. Each report's hash is checked
+against the token and its time against the clock, and what passes is kept in
+the app's data directory, readable only by the user. A session over SSH, in
+Docker or in a pod never gets a token, so no remote program can register a
+command.
+
+When the process of a program is gone, File > Resume Programs… lists it with
+the command it asked for: a button brings one back in a new tab, in the
+directory it asked for, and Resume All brings them all. A record outlives
+the app, so a program can come back after a restart; closing its tab on
+purpose drops it. A program reports again when it wants to be brought back
+once more.
 
 # Appearance and language
 

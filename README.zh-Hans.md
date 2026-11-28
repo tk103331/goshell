@@ -42,6 +42,8 @@ Docker 和 Kubernetes 主机，在主机下打开终端会话，并把这些主�
 - 首次启动时检测本地 Docker daemon，并自动添加配置。
 - 支持 Program Status Protocol（OSC 7501）：会话行图标显示程序状态，
   悬停可查看消息。
+- 支持 Program Resume Protocol（OSC 7577）：程序退出后可带着它指定的
+  命令，从 File > Resume Programs… 恢复。
 - 终端标题栏支持查找；检测到新版本时，左侧栏底部显示下载提醒。
 - 支持从 GitHub Release 签名自动更新，并提供 Help > Check for Updates…
 
@@ -152,6 +154,20 @@ status() {
 status working "Syncing photos"
 rsync -a ~/Photos backup:/photos && status done "Photos synced" || status error "rsync failed"
 ```
+
+# 程序恢复
+
+GoShell 支持 [Program Resume Protocol](https://www.superlogical.com/rex/docs/build/program-resume)
+（OSC 7577）。本地终端会把 `OSC7577_TOKEN` 放进伪终端首个进程的环境变量，
+发现它的程序可以上报恢复所需的命令和工作目录。每条上报的哈希会用该 Token
+校验，时间会与应用时钟比对，通过校验的记录保存在应用的数据目录中，只有
+当前用户可读。SSH、Docker 或 Pod 中的会话不会获得 Token，因此远程程序无法
+登记命令。
+
+程序进程退出后，File > Resume Programs… 会列出它及其上报的命令：点击按钮
+会在新标签页中按它指定的目录恢复一个程序，Resume All 则恢复全部。记录会在
+应用重启后保留，因此程序能在重启后恢复；但用户主动关闭其标签页时记录会被
+丢弃。若程序希望再次被恢复，它会重新上报。
 
 # 外观与语言
 

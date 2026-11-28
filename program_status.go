@@ -441,7 +441,7 @@ func statusText(rec programRecord) string {
 	}
 	if rec.msg != "" {
 		b.WriteString(" — ")
-		b.WriteString(sanitizeStatus(rec.msg))
+		b.WriteString(sanitizeText(rec.msg))
 	}
 	return b.String()
 }
@@ -449,9 +449,9 @@ func statusText(rec programRecord) string {
 // statusName is the label of a record: its app, else its title.
 func statusName(rec programRecord) string {
 	if rec.app != "" {
-		return sanitizeStatus(rec.app)
+		return sanitizeText(rec.app)
 	}
-	return sanitizeStatus(rec.title)
+	return sanitizeText(rec.title)
 }
 
 // statusLabel names a state in the app's language.
@@ -469,9 +469,10 @@ func statusLabel(state string) string {
 	return state
 }
 
-// sanitizeStatus removes the invisible formatting characters the protocol
-// says to take out of text shown outside the terminal grid.
-func sanitizeStatus(s string) string {
+// sanitizeText removes the invisible formatting characters the protocols
+// say to take out of text shown outside the terminal grid: a right-to-left
+// override may mislead the user reading it.
+func sanitizeText(s string) string {
 	return strings.Map(func(r rune) rune {
 		if unicode.Is(unicode.Cf, r) {
 			return -1

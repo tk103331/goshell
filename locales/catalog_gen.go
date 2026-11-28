@@ -2273,3 +2273,83 @@ func UpdateAvailable(version string) string { return In(i18n.Locale()).UpdateAva
 func (msgs Messages) UpdateAvailable(version string) string {
 	return Catalog.Format(msgs.locale, "updateAvailable", map[string]any{"version": version})
 }
+
+// MenuResumePrograms says "Resume Programs…"
+// in the language the app shows.
+func MenuResumePrograms() string { return In(i18n.Locale()).MenuResumePrograms() }
+
+// MenuResumePrograms says "Resume Programs…"
+// in the language of msgs.
+func (msgs Messages) MenuResumePrograms() string {
+	return Catalog.Format(msgs.locale, "menuResumePrograms", nil)
+}
+
+// ResumeTitle says "Resume Programs"
+// in the language the app shows.
+func ResumeTitle() string { return In(i18n.Locale()).ResumeTitle() }
+
+// ResumeTitle says "Resume Programs"
+// in the language of msgs.
+func (msgs Messages) ResumeTitle() string {
+	return Catalog.Format(msgs.locale, "resumeTitle", nil)
+}
+
+// ResumeHint says "These programs told GoShell how to bring them back."
+// in the language the app shows.
+func ResumeHint() string { return In(i18n.Locale()).ResumeHint() }
+
+// ResumeHint says "These programs told GoShell how to bring them back."
+// in the language of msgs.
+func (msgs Messages) ResumeHint() string {
+	return Catalog.Format(msgs.locale, "resumeHint", nil)
+}
+
+// ResumeNone says "There is nothing to bring back."
+// in the language the app shows.
+func ResumeNone() string { return In(i18n.Locale()).ResumeNone() }
+
+// ResumeNone says "There is nothing to bring back."
+// in the language of msgs.
+func (msgs Messages) ResumeNone() string {
+	return Catalog.Format(msgs.locale, "resumeNone", nil)
+}
+
+// ResumeAll says "Resume All"
+// in the language the app shows.
+func ResumeAll() string { return In(i18n.Locale()).ResumeAll() }
+
+// ResumeAll says "Resume All"
+// in the language of msgs.
+func (msgs Messages) ResumeAll() string {
+	return Catalog.Format(msgs.locale, "resumeAll", nil)
+}
+
+// ResumeBtn says "Resume"
+// in the language the app shows.
+func ResumeBtn() string { return In(i18n.Locale()).ResumeBtn() }
+
+// ResumeBtn says "Resume"
+// in the language of msgs.
+func (msgs Messages) ResumeBtn() string {
+	return Catalog.Format(msgs.locale, "resumeBtn", nil)
+}
+
+// ResumeNoDir says "The folder {dir} is gone."
+// in the language the app shows.
+func ResumeNoDir(dir string) string { return In(i18n.Locale()).ResumeNoDir(dir) }
+
+// ResumeNoDir says "The folder {dir} is gone."
+// in the language of msgs.
+func (msgs Messages) ResumeNoDir(dir string) string {
+	return Catalog.Format(msgs.locale, "resumeNoDir", map[string]any{"dir": dir})
+}
+
+// ResumeNotFound says "{name} is not on PATH."
+// in the language the app shows.
+func ResumeNotFound(name string) string { return In(i18n.Locale()).ResumeNotFound(name) }
+
+// ResumeNotFound says "{name} is not on PATH."
+// in the language of msgs.
+func (msgs Messages) ResumeNotFound(name string) string {
+	return Catalog.Format(msgs.locale, "resumeNotFound", map[string]any{"name": name})
+}
