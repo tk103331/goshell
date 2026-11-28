@@ -22,3 +22,30 @@ jobs:
         run: go vet ./...
       - name: Check the i18n catalogs
         run: go tool mygo i18n check
+
+  # The code has files of its own for each platform, and a mistake in one
+  # of them only shows when that platform is built: the build above only
+  # checks the one the runner is.
+  platform:
+    name: ${{ matrix.os }}/${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows, arch: amd64 }
+          - { os: windows, arch: arm64 }
+          - { os: linux, arch: amd64 }
+          - { os: linux, arch: arm64 }
+          - { os: darwin, arch: amd64 }
+          - { os: darwin, arch: arm64 }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+        run: go build ./...
